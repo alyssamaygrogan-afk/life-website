@@ -283,10 +283,85 @@ async function prepareWeeklyDrafts(automatic){
  if(!automatic)info(count?count+' weekly drafts prepared — review in Posts':'This week’s drafts are already prepared');
 }
 function prompts(){var count=0;for(var day=new Date('2026-10-22T12:00:00Z');day<=new Date('2027-01-30T12:00:00Z');day.setUTCDate(day.getUTCDate()+1)){var date=day.toISOString().slice(0,10),remaining=Math.round((Date.parse('2027-01-30T12:00:00Z')-day.getTime())/86400000);if(data.posts.some(function(p){return p.date===date&&p.title.indexOf('Countdown')===0}))continue;data.posts.push({id:id(),title:'Countdown '+remaining+' days',date:date,time:'12:00',status:'Draft',caption:remaining+' days until L-I-F-E launches in Milton Keynes. Three sisters. One dream. A future for everyone. www.lifeinfullecosystem.org'});count++}return count}
-q('#body').addEventListener('click',async function(e){var b=e.target.closest('button');if(!b)return;try{var a=b.dataset.action;if(b.dataset.edit){editing=b.dataset.edit;navigate('post')}else if(b.dataset.editcontact){contactEditing=b.dataset.editcontact;navigate('contact')}else if(b.dataset.copy){var p=data.posts.find(function(p){return p.id===b.dataset.copy});await navigator.clipboard.writeText(p.caption);info('Caption copied')}else if(a==='newpost'){editing=null;navigate('post')}else if(a==='newcontact'){contactEditing=null;navigate('contact')}else if(a==='posts'||a==='contacts')navigate(a);else if(a==='backup'){download();info(lastSaveFailed?'Backup contains only the last saved version':'Encrypted backup downloaded')}else if(a==='weekly'){await prepareWeeklyDrafts(false);navigate('home')}else if(a==='prompts'){var n=prompts();if(await save())info(n+' countdown drafts added')}else if(a==='next'||a==='previous'){month=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5))-1+(a==='next'?1:-1),1)).toISOString().slice(0,7);render()}else if(a==='deletepost'){if(!confirm('Delete this post?'))return;data.posts=data.posts.filter(function(p){return p.id!==editing});editing=null;if(await save())navigate('posts')}}catch(err){info('Could not complete action: '+err.message)}});
-q('#body').addEventListener('submit',async function(e){e.preventDefault();var f=new FormData(e.target);if(e.target.id==='postform'){var oldPost=data.posts.find(function(z){return z.id===editing});var p=Object.assign({},oldPost||{},{id:editing||id(),title:String(f.get('title')).trim(),date:String(f.get('date')),time:String(f.get('time')),status:String(f.get('status')),caption:String(f.get('caption')).trim()});if(!p.title||!p.caption)return;data.posts=data.posts.filter(function(z){return z.id!==p.id});data.posts.push(p);editing=null;if(await save())navigate('posts')}else if(e.target.id==='contactform'){var c={id:contactEditing||id(),name:String(f.get('name')),category:String(f.get('category')),status:String(f.get('status')),notes:String(f.get('notes'))};data.contacts=data.contacts.filter(function(z){return z.id!==c.id});data.contacts.push(c);contactEditing=null;if(await save())navigate('contacts')}});
+q('#body').addEventListener('click',async function(e){var b=e.target.closest('button');if(!b)return;try{var a=b.dataset.action;if(b.dataset.edit){editing=b.dataset.edit;navigate('post')}else if(b.dataset.editcontact){contactEditing=b.dataset.editcontact;navigate('contact')}else if(b.dataset.editad){adEditing=b.dataset.editad;navigate('ad')}else if(b.dataset.copy){var p=data.posts.find(function(p){return p.id===b.dataset.copy});await navigator.clipboard.writeText(p.caption);info('Caption copied')}else if(a==='newpost'){editing=null;navigate('post')}else if(a==='newad'){adEditing=null;navigate('ad')}else if(a==='exportposts'){exportCsv('posts');info('Private CSV exported — protect the file')}else if(a==='exportads'){exportCsv('ads');info('Private CSV exported — protect the file')}else if(a==='newcontact'){contactEditing=null;navigate('contact')}else if(a==='posts'||a==='contacts'||a==='campaigns')navigate(a);else if(a==='backup'){download();info(lastSaveFailed?'Backup contains only the last saved version':'Encrypted backup downloaded')}else if(a==='weekly'){await prepareWeeklyDrafts(false);navigate('home')}else if(a==='prompts'){var n=prompts();if(await save())info(n+' countdown drafts added')}else if(a==='next'||a==='previous'){month=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5))-1+(a==='next'?1:-1),1)).toISOString().slice(0,7);render()}else if(a==='deletepost'){if(!confirm('Delete this post?'))return;data.posts=data.posts.filter(function(p){return p.id!==editing});editing=null;if(await save())navigate('posts')}else if(a==='deletead'){if(!confirm('Delete this advertising plan?'))return;data.adPlans=(data.adPlans||[]).filter(function(p){return p.id!==adEditing});adEditing=null;if(await save())navigate('campaigns')}}catch(err){info('Could not complete action: '+err.message)}});
+
+function metricNumber(raw,limit){
+ if(raw===''||raw===null||raw===undefined)return undefined;
+ var n=Number(raw);if(!Number.isSafeInteger(n)||n<0||n>limit)throw Error('Use a positive whole number no greater than '+limit+' for manual metrics.');
+ return n;
+}
+function gbpNumber(raw){
+ var n=Number(raw);if(raw===''||!Number.isFinite(n)||n<0||n>10000000)return null;
+ return Math.round((n+Number.EPSILON)*100)/100;
+}
+function formProblem(selector,message){
+ var el=q(selector);if(el){el.textContent=message;el.classList.remove('hidden')}return false;
+}
+q('#body').addEventListener('submit',async function(e){
+ e.preventDefault();
+ var form=e.target,f=new FormData(form);
+ if(form.id==='postform'){
+  try{
+   var oldPost=data.posts.find(function(z){return z.id===editing});
+   var p=Object.assign({},oldPost||{},{
+    id:editing||id(),title:String(f.get('title')).trim(),date:String(f.get('date')),time:String(f.get('time')),
+    status:String(f.get('status')),caption:String(f.get('caption')).trim(),topic:String(f.get('topic')),
+    format:String(f.get('format')),networks:f.getAll('networks').map(String),
+    assetRef:String(f.get('assetRef')).trim(),altText:String(f.get('altText')).trim(),
+    ctaUrl:String(f.get('ctaUrl')).trim(),publishedUrl:String(f.get('publishedUrl')).trim(),
+    views:metricNumber(f.get('views'),1000000000),clicks:metricNumber(f.get('clicks'),1000000000),
+    interactions:metricNumber(f.get('interactions'),1000000000),
+    reviewed:f.has('reviewed'),reviewedAt:f.has('reviewed')?new Date().toISOString():''
+   });
+   if(!p.title||!p.caption)return formProblem('#postformerror','Add a title and caption.');
+   if(!POST_STATUSES.includes(p.status)||!TOPICS.includes(p.topic)||!FORMATS.includes(p.format)||p.networks.some(function(n){return !CHANNELS.includes(n)}))return formProblem('#postformerror','Choose valid publishing settings.');
+   var errors=releaseChecks(p,f.has('reviewed'),f.has('postedExternally'));
+   if(errors.length)return formProblem('#postformerror',errors.join(' '));
+   data.posts=data.posts.filter(function(z){return z.id!==p.id});data.posts.push(p);
+   if(await save()){editing=null;navigate('posts')}
+  }catch(err){formProblem('#postformerror','Could not save this post: '+err.message)}
+ }else if(form.id==='contactform'){
+  var c={id:contactEditing||id(),name:String(f.get('name')),category:String(f.get('category')),status:String(f.get('status')),notes:String(f.get('notes'))};
+  data.contacts=data.contacts.filter(function(z){return z.id!==c.id});data.contacts.push(c);contactEditing=null;if(await save())navigate('contacts');
+ }else if(form.id==='launchform'){
+  var oldChecks=data.launchChecks||{};
+  var next={
+   venueName:String(f.get('venueName')||'').trim(),
+   bookingUrl:String(f.get('bookingUrl')||'').trim(),
+   ticketDetails:String(f.get('ticketDetails')||'').trim(),
+   venueApproved:f.has('venueApproved'),ticketsApproved:f.has('ticketsApproved')
+  };
+  if(next.bookingUrl&&!safeUrl(next.bookingUrl))return formProblem('#launcherror','Use a working https:// link for reservations.');
+  if(next.venueApproved&&!next.venueName)return formProblem('#launcherror','A venue name is needed before confirming it.');
+  if(next.ticketsApproved&&(!next.ticketDetails||!next.bookingUrl))return formProblem('#launcherror','Approved ticket details and the booking link are needed before confirming tickets.');
+  var detailsChanged=['venueName','bookingUrl','ticketDetails'].some(function(k){return (oldChecks[k]||'')!==next[k]});
+  if(detailsChanged){next.venueApproved=false;next.ticketsApproved=false;}
+  data.launchChecks=next;
+  if(await save())info(detailsChanged?'Details saved privately. Review and reconfirm the release checkboxes.':'Release checklist saved privately.');
+ }else if(form.id==='adform'){
+  var prior=(data.adPlans||[]).find(function(p){return p.id===adEditing});
+  var budget=gbpNumber(String(f.get('budget')||'0')),spent=gbpNumber(String(f.get('spent')||'0'));
+  if(budget===null||spent===null)return formProblem('#aderror','Use valid nonnegative pound amounts.');
+  var status=String(f.get('status'));
+  if(!AD_STATUSES.includes(status)||!ADS_CHANNELS.includes(String(f.get('platform')))||!AD_GOALS.includes(String(f.get('goal'))))return formProblem('#aderror','Choose supported campaign settings.');
+  if(['Approved plan','Reported live externally','Completed externally'].includes(status)&&!f.has('planApproved'))return formProblem('#aderror','Confirm the external budget approval before advancing this plan.');
+  if(f.get('startDate')&&f.get('endDate')&&String(f.get('endDate'))<String(f.get('startDate')))return formProblem('#aderror','The end date must be on or after the start date.');
+  var p=Object.assign({},prior||{},{
+   id:adEditing||id(),name:String(f.get('name')||'').trim(),platform:String(f.get('platform')),goal:String(f.get('goal')),
+   startDate:String(f.get('startDate')),endDate:String(f.get('endDate')),budget:budget,spent:spent,status:status,
+   notes:String(f.get('notes')||'').trim(),approvedLocally:f.has('planApproved')
+  });
+  if(!p.name)return formProblem('#aderror','Enter a campaign name.');
+  data.adPlans=(data.adPlans||[]).filter(function(x){return x.id!==p.id});data.adPlans.push(p);
+  if(await save()){adEditing=null;navigate('campaigns')}
+ }
+});
+
 q('#body').addEventListener('change',async function(e){
- var el=e.target;if(!el.matches('[data-setup-account][data-setup-field]'))return;
+ var el=e.target;
+ if(el.id==='postfilter'){postFilter=el.value;render();return}
+ if(el.id==='postsearch'){postQuery=el.value.slice(0,300);render();return}
+ if(!el.matches('[data-setup-account][data-setup-field]'))return;
  if(!data||!key)return;
  var id=el.dataset.setupAccount,field=el.dataset.setupField;
  if(!SOCIAL_PLATFORMS.some(function(p){return p.id===id})||!['created','secured'].includes(field))return;
