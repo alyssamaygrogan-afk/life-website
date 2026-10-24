@@ -55,6 +55,8 @@ try{
    assert.equal(await page.getByText('Encrypted backups').isVisible(),true);
    await page.locator('[data-page="connections"]').click();
    assert.equal(await page.getByText('API not connected',{exact:true}).count(),11);
+   assert.equal(await page.locator('#buffer-never-used').count(),0);
+   assert.equal(await page.locator('a[href="https://publish.buffer.com/"]').count(),1);
    assert.equal(await page.getByText('0 of 11 accounts marked created').isVisible(),true);
    const created=page.locator('[data-setup-account="facebook"][data-setup-field="created"]');
    await created.check();
