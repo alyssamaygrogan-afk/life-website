@@ -32,7 +32,7 @@ try{
    await page.locator('[data-action="newpost"]').first().click();
    await page.locator('[name="title"]').fill('Save the date');
    await page.locator('[name="caption"]').fill('30 January 2027 in Milton Keynes');
-   await page.locator('#postform button[type="submit"]').click();
+   await page.locator('#postform button.btn.primary').click();
    await page.getByText('Save the date',{exact:true}).first().waitFor();
    const ciphertext=await page.evaluate(()=>localStorage.getItem('life-hq-device-v1'));
    assert.ok(ciphertext&&!ciphertext.includes('Save the date'));
@@ -48,7 +48,7 @@ try{
    await page.locator('[data-page="contacts"]').click();
    await page.locator('[data-action="newcontact"]').click();
    await page.locator('[name="name"]').fill('MKFM');
-   await page.locator('#contactform button[type="submit"]').click();
+   await page.locator('#contactform button.btn.primary').click();
    await page.getByText('MKFM',{exact:true}).first().waitFor();
    await page.locator('[data-page="settings"]').click();
    assert.equal(await page.getByText('Encrypted backups').isVisible(),true);
