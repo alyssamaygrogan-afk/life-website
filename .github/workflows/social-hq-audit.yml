@@ -25,6 +25,8 @@ jobs:
           node-version: '22'
       - name: Run five independent app audit passes
         run: node --test tests/social-hq-audit.test.mjs
+      - name: Run Campaign Studio safety regression tests
+        run: node --test tests/social-hq-studio.test.mjs
       - name: Install browser test driver
         run: npm install --no-save --no-package-lock --ignore-scripts playwright-core@1.56.1
       - name: Run desktop and mobile browser smoke tests
