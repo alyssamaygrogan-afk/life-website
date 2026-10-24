@@ -34,3 +34,14 @@ Facebook Page, Instagram, Threads, TikTok, YouTube, LinkedIn Page, Pinterest, Me
 - Use genuine members/admins for Meta and LinkedIn, rather than fake personal profiles. Organizational Pages are distinct public identities but their administrators can still be real personal accounts; use platform roles for delegation.
 - No spending authorization or billing details should be entered until L-I-F-E approves an actual campaign budget.
 - A future protected backend (not static GitHub Pages) and official per-provider OAuth/developer approvals are necessary for posting, analytics and ads.
+
+## Monday weekly draft planning and the 40-day campaign milestone
+
+- **Every Monday while an admin unlocks the device workspace**, the app creates up to seven **Draft** posts (Monday through Sunday) for the current week. No post is automatically published, approved or scheduled with any provider. If the app is closed, it cannot generate drafts in the background.
+- On other days, the Overview's **Prepare missing drafts for this week** button creates any missing weekly posts. On Saturday/Sunday, it targets the following Monday.
+- Drafts carry a stable `weeklyKey` in the encrypted document. Re-running the planner does not duplicate posts, including after editing their titles/captions. Other user-created posts are never overwritten or deleted.
+- The date milestone is **Thursday 3 December 2026**, exactly **40 calendar days after Saturday 24 October 2026**, **not** 40 days before the 30 January 2027 launch. The prior 16/21 December draft dates are superseded.
+- The draft generated for **3 December** is a clearly marked, **NOT READY TO PUBLISH** venue and ticket placeholder. It never invents the venue, prices, ticket/payment links, or official approvals; people must confirm the venue and any approved ticket options before sharing.
+- The current free ticket reservation form is already publicly available separately on the homepage. It is **not** a paid presale. Any optional donation or paid ticket needs separate approval and accurately published terms.
+- A separate ChatGPT weekly reminder provides Monday nudges; **this static website itself does not provide push notifications**. Reminders and browser drafts do not depend on a social media connection.
+- Device-local encrypted data stays in the existing `life-hq-device-v1` format; the original password still unlocks the user's drafts. Future cloud sync is not yet available.
