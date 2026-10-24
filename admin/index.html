@@ -29,6 +29,38 @@ function validateWorkspace(d){
  for(var c of d.contacts){
   if(!c||typeof c!=='object'||!isText(c.id,120)||!c.id||!isText(c.name,10000)||(c.category!==undefined&&!isText(c.category,10000))||(c.status!==undefined&&!isText(c.status,100))||(c.notes!==undefined&&!isText(c.notes,100000)))throw Error('Invalid contact in workspace');
  }
+ if(d.posts.length>10000||d.contacts.length>20000)throw Error('Workspace too large');
+ for(var p of d.posts){
+  for(var field of ['topic','format','assetRef','altText','ctaUrl','publishedUrl','reviewedAt']){
+   if(p[field]!==undefined&&!isText(p[field],field==='caption'?10000:10000))throw Error('Invalid post '+field);
+  }
+  for(var stat of ['views','clicks','interactions']){
+   if(p[stat]!==undefined&&(!Number.isSafeInteger(p[stat])||p[stat]<0||p[stat]>1000000000))throw Error('Invalid post metric');
+  }
+  if(p.reviewed!==undefined&&typeof p.reviewed!=='boolean')throw Error('Invalid review record');
+ }
+ if(d.launchChecks!==undefined){
+  var v=d.launchChecks;
+  if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Invalid release checklist');
+  for(var field of ['venueName','bookingUrl','ticketDetails']){
+   if(v[field]!==undefined&&!isText(v[field],5000))throw Error('Invalid release checklist field');
+  }
+  if(v.venueApproved!==undefined&&typeof v.venueApproved!=='boolean')throw Error('Invalid venue check');
+  if(v.ticketsApproved!==undefined&&typeof v.ticketsApproved!=='boolean')throw Error('Invalid tickets check');
+ }
+ if(d.adPlans!==undefined){
+  if(!Array.isArray(d.adPlans)||d.adPlans.length>2000)throw Error('Invalid advertising plans');
+  for(var ad of d.adPlans){
+   if(!ad||typeof ad!=='object'||!isText(ad.id,120)||!ad.id||!isText(ad.name,200)||!isText(ad.platform,120)||!isText(ad.status,120))throw Error('Invalid advertising plan');
+   for(var field of ['goal','startDate','endDate','notes']){
+    if(ad[field]!==undefined&&!isText(ad[field],5000))throw Error('Invalid advertising plan field');
+   }
+   for(var field of ['budget','spent']){
+    if(typeof ad[field]!=='number'||!Number.isFinite(ad[field])||ad[field]<0||ad[field]>10000000)throw Error('Invalid advertising value');
+   }
+   if(ad.approvedLocally!==undefined&&typeof ad.approvedLocally!=='boolean')throw Error('Invalid advertising approval');
+  }
+ }
  return d;
 }
 async function encrypt(){
@@ -66,6 +98,7 @@ function top(){
  +'<div class="stats"><div class="panel">Saved posts<strong>'+data.posts.length+'</strong></div><div class="panel">Ready<strong>'+data.posts.filter(function(x){return x.status==='Ready'}).length+'</strong></div><div class="panel">Contacts<strong>'+data.contacts.length+'</strong></div></div>'
  +'<div class="panel"><h3>Monday weekly planning</h3><p>Plan for '+esc(monday)+' to '+esc(weekEnd)+' · '+filled+' of 7 weekly drafts prepared.</p><p>Every Monday, open your dashboard to review the upcoming seven post drafts. Posts stay private drafts until you approve and publish them manually.</p><button class="btn primary" data-action="weekly">Prepare missing drafts for this week</button></div>'
  +'<div class="warn">Encrypted on this device. Use backups to transfer between devices. No background app notifications, Google Drive sync or automatic social publishing.</div>'
+ +'<div class="panel"><h3>Content approvals and reports</h3><p>Review queued posts, plan publicity spending safely, and enter results after publishing on external platforms.</p><div class="actions"><button class="btn" data-action="openposts">Review posts</button><button class="btn" data-action="opencampaigns">Campaigns</button><button class="btn" data-action="openreports">Reports</button></div></div>'
  +'<div class="panel"><h3>Campaign dates</h3><p>22 October 2026 — Countdown begins</p><p><strong>3 December 2026 — Venue reveal and ticket promotion target (40 days after 24 October)</strong></p><p>Only publish the confirmed venue, verified ticket types and approved payment or booking links. Free ticket reservations already exist; do not invent presale prices.</p><p>30 January 2027 — Launch and premiere video</p></div>';
 }
 
@@ -81,7 +114,7 @@ function releaseChecks(p,reviewed,postedExternally){
  if(isPublicStatus(p.status)&&!reviewed)problems.push('Confirm that you reviewed this version of the post before marking it ready.');
  if(p.ctaUrl&&!safeUrl(p.ctaUrl))problems.push('The call-to-action link must be a valid https:// link.');
  if(p.publishedUrl&&!safeUrl(p.publishedUrl))problems.push('The published post link must be a valid https:// link.');
- if(isPublicStatus(p.status)&&(p.format==='Image'||p.format==='Carousel')&&!p.altText.trim())problems.push('Add image alt text before marking visual posts ready.');
+ if(isPublicStatus(p.status)&&(p.format==='Image'||p.format==='Carousel')&&!String(p.altText||'').trim())problems.push('Add image alt text before marking visual posts ready.');
  if(p.status==='Published'&&!postedExternally)problems.push('Only mark Published after confirming you posted it on the external platform.');
  if(isPublicStatus(p.status)&&tag==='Venue / tickets'){
   var details=data.launchChecks||{};
@@ -127,7 +160,7 @@ function postForm(){
  +'<div class="actions full"><button class="btn primary">Save post</button><button class="btn" type="button" data-action="posts">Cancel</button>'+(editing?'<button class="btn danger" type="button" data-action="deletepost">Delete</button>':'')+'</div></form></div>';
 }
 
-function calendar(){var y=Number(month.slice(0,4)),m=Number(month.slice(5)),first=new Date(Date.UTC(y,m-1,1)),n=new Date(Date.UTC(y,m,0)).getUTCDate(),pad=(first.getUTCDay()+6)%7;var html='<div class="actions"><button class="btn" data-action="previous">←</button><h3>'+first.toLocaleDateString('en-GB',{month:'long',year:'numeric',timeZone:'UTC'})+'</h3><button class="btn" data-action="next">→</button></div><div class="cal">'+['M','T','W','T','F','S','S'].map(function(s){return '<div class="day">'+s+'</div>'}).join('');for(var i=0;i<Math.ceil((pad+n)/7)*7;i++){var day=i-pad+1,date=day>0&&day<=n?month+'-'+String(day).padStart(2,'0'):'';html+='<div class="day">'+(date?'<strong>'+day+'</strong>'+data.posts.filter(function(p){return p.date===date}).slice(0,3).map(function(p){return '<div class="event">'+esc(p.title)+'</div>'}).join(''):'')+'</div>'}return html+'</div>'}
+function calendar(){var y=Number(month.slice(0,4)),m=Number(month.slice(5)),first=new Date(Date.UTC(y,m-1,1)),n=new Date(Date.UTC(y,m,0)).getUTCDate(),pad=(first.getUTCDay()+6)%7;var html='<div class="actions"><button class="btn" data-action="previous">←</button><h3>'+first.toLocaleDateString('en-GB',{month:'long',year:'numeric',timeZone:'UTC'})+'</h3><button class="btn" data-action="next">→</button></div><div class="cal">'+['M','T','W','T','F','S','S'].map(function(s){return '<div class="day">'+s+'</div>'}).join('');for(var i=0;i<Math.ceil((pad+n)/7)*7;i++){var day=i-pad+1,date=day>0&&day<=n?month+'-'+String(day).padStart(2,'0'):'';html+='<div class="day">'+(date?'<strong>'+day+'</strong>'+data.posts.filter(function(p){return p.date===date}).slice(0,3).map(function(p){return '<button class="calendar-event" data-edit="'+esc(p.id)+'" aria-label="Edit '+esc(p.title)+' on '+esc(date)+'">'+esc(p.title)+'</button>'}).join(''):'')+'</div>'}return html+'</div>'}
 function contacts(){return '<div class="actions"><button class="btn primary" data-action="newcontact">Add contact</button></div><div class="panel">'+(data.contacts.length?data.contacts.map(function(c){return '<div class="row"><h3>'+esc(c.name)+'</h3><span class="tag">'+esc(c.status)+'</span> '+esc(c.category)+'<p>'+esc(c.notes)+'</p><button class="btn" data-editcontact="'+esc(c.id)+'">Edit</button></div>'}).join(''):'No contacts yet. Add local papers, radio, councillors, MPs and St John contacts.')+'</div>'}
 function contactForm(){var c=data.contacts.find(function(x){return x.id===contactEditing})||{name:'',category:'Local media',status:'To contact',notes:''};return '<div class="panel"><h3>Contact</h3><form id="contactform"><label class="field">Name<input name="name" required value="'+esc(c.name)+'"></label><label class="field">Category<input name="category" value="'+esc(c.category)+'"></label><label class="field">Status<select name="status">'+['To contact','Contacted','Awaiting reply','Confirmed','Declined'].map(function(s){return '<option '+(s===c.status?'selected':'')+'>'+s+'</option>'}).join('')+'</select></label><label class="field">Notes<textarea name="notes">'+esc(c.notes)+'</textarea></label><div class="actions"><button class="btn primary">Save contact</button><button class="btn" type="button" data-action="contacts">Cancel</button></div></form></div>'}
 
@@ -283,7 +316,7 @@ async function prepareWeeklyDrafts(automatic){
  if(!automatic)info(count?count+' weekly drafts prepared — review in Posts':'This week’s drafts are already prepared');
 }
 function prompts(){var count=0;for(var day=new Date('2026-10-22T12:00:00Z');day<=new Date('2027-01-30T12:00:00Z');day.setUTCDate(day.getUTCDate()+1)){var date=day.toISOString().slice(0,10),remaining=Math.round((Date.parse('2027-01-30T12:00:00Z')-day.getTime())/86400000);if(data.posts.some(function(p){return p.date===date&&p.title.indexOf('Countdown')===0}))continue;data.posts.push({id:id(),title:'Countdown '+remaining+' days',date:date,time:'12:00',status:'Draft',caption:remaining+' days until L-I-F-E launches in Milton Keynes. Three sisters. One dream. A future for everyone. www.lifeinfullecosystem.org'});count++}return count}
-q('#body').addEventListener('click',async function(e){var b=e.target.closest('button');if(!b)return;try{var a=b.dataset.action;if(b.dataset.edit){editing=b.dataset.edit;navigate('post')}else if(b.dataset.editcontact){contactEditing=b.dataset.editcontact;navigate('contact')}else if(b.dataset.editad){adEditing=b.dataset.editad;navigate('ad')}else if(b.dataset.copy){var p=data.posts.find(function(p){return p.id===b.dataset.copy});await navigator.clipboard.writeText(p.caption);info('Caption copied')}else if(a==='newpost'){editing=null;navigate('post')}else if(a==='newad'){adEditing=null;navigate('ad')}else if(a==='exportposts'){exportCsv('posts');info('Private CSV exported — protect the file')}else if(a==='exportads'){exportCsv('ads');info('Private CSV exported — protect the file')}else if(a==='newcontact'){contactEditing=null;navigate('contact')}else if(a==='posts'||a==='contacts'||a==='campaigns')navigate(a);else if(a==='backup'){download();info(lastSaveFailed?'Backup contains only the last saved version':'Encrypted backup downloaded')}else if(a==='weekly'){await prepareWeeklyDrafts(false);navigate('home')}else if(a==='prompts'){var n=prompts();if(await save())info(n+' countdown drafts added')}else if(a==='next'||a==='previous'){month=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5))-1+(a==='next'?1:-1),1)).toISOString().slice(0,7);render()}else if(a==='deletepost'){if(!confirm('Delete this post?'))return;data.posts=data.posts.filter(function(p){return p.id!==editing});editing=null;if(await save())navigate('posts')}else if(a==='deletead'){if(!confirm('Delete this advertising plan?'))return;data.adPlans=(data.adPlans||[]).filter(function(p){return p.id!==adEditing});adEditing=null;if(await save())navigate('campaigns')}}catch(err){info('Could not complete action: '+err.message)}});
+q('#body').addEventListener('click',async function(e){var b=e.target.closest('button');if(!b)return;try{var a=b.dataset.action;if(b.dataset.edit){editing=b.dataset.edit;navigate('post')}else if(b.dataset.editcontact){contactEditing=b.dataset.editcontact;navigate('contact')}else if(b.dataset.editad){adEditing=b.dataset.editad;navigate('ad')}else if(b.dataset.copy){var p=data.posts.find(function(p){return p.id===b.dataset.copy});await navigator.clipboard.writeText(p.caption);info('Caption copied')}else if(a==='newpost'){editing=null;navigate('post')}else if(a==='openposts')navigate('posts')else if(a==='opencampaigns')navigate('campaigns')else if(a==='openreports')navigate('reports')else if(a==='newad'){adEditing=null;navigate('ad')}else if(a==='exportposts'){exportCsv('posts');info('Private CSV exported — protect the file')}else if(a==='exportads'){exportCsv('ads');info('Private CSV exported — protect the file')}else if(a==='newcontact'){contactEditing=null;navigate('contact')}else if(a==='posts'||a==='contacts'||a==='campaigns')navigate(a);else if(a==='backup'){download();info(lastSaveFailed?'Backup contains only the last saved version':'Encrypted backup downloaded')}else if(a==='weekly'){await prepareWeeklyDrafts(false);navigate('home')}else if(a==='prompts'){var n=prompts();if(await save())info(n+' countdown drafts added')}else if(a==='next'||a==='previous'){month=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5))-1+(a==='next'?1:-1),1)).toISOString().slice(0,7);render()}else if(a==='deletepost'){if(!confirm('Delete this post?'))return;data.posts=data.posts.filter(function(p){return p.id!==editing});editing=null;if(await save())navigate('posts')}else if(a==='deletead'){if(!confirm('Delete this advertising plan?'))return;data.adPlans=(data.adPlans||[]).filter(function(p){return p.id!==adEditing});adEditing=null;if(await save())navigate('campaigns')}}catch(err){info('Could not complete action: '+err.message)}});
 
 function metricNumber(raw,limit){
  if(raw===''||raw===null||raw===undefined)return undefined;
