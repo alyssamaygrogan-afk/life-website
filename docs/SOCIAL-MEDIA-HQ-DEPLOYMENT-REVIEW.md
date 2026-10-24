@@ -34,3 +34,13 @@ No publishing action, login setup, Google Drive write or website deployment has 
 ## 24 October — v0.3 candidate
 
 A new *downloadable* v0.3 candidate adds stale OAuth callback invalidation, session-generation checks during login and Drive discovery, explicit failed-token revocation, no pre-authorized workspace DOM rendering, scoped mobile Home Screen manifest and iPhone icons. Twelve mocked local Chromium tests passed (the previous eight plus four regressions). JavaScript syntax checks passed. The ZIP remains off the website and outside this PR; no public files or DNS records were changed. Google OAuth client ID and server/edge authorization remain outstanding. The PR remains a review-only draft and **must not be merged as a deployment**.
+
+## 24 October — v0.4 candidate
+
+Another **local downloadable** build completed (app source remains in the ZIP, **not committed to this public GitHub repository**). No production deployment, OAuth registration, social publishing, domain change or Google Drive write occurred.
+
+**Code changes:** Stale cloud refreshes cannot repopulate the workspace after sign-out, reconnect or local edits. Remote revision is rechecked after reading. Sign-out now clears private content from the JavaScript runtime and page DOM as well as the device cache. Private workspace content is not loaded into application state before a verified login. Google Identity Services is preloaded once when a public OAuth client ID is configured, reducing popup timing failures. Uploads check session state before writing.
+
+**Validation:** 16/16 mocked Chromium scenarios passed: baseline five, three Drive reliability, four OAuth/PWA and four new sign-out/cloud-refresh regressions. JS syntax checks and ZIP integrity passed. These tests did not use the real Google OAuth app, real Google Drive or actual iPhone Safari. The existing 4 MB Drive workspace cap and best-effort (non-transactional) concurrent write guard remain.
+
+**Still blocking public release:** OAuth web client ID, production server-enforced admin route privacy, real approved-account/Drive tests, phone and desktop acceptance, explicit deployment authorization. The site's public home page and registration form are unchanged.
