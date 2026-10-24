@@ -1,0 +1,31 @@
+name: Social Media HQ five-pass audit
+
+on:
+  push:
+    branches:
+      - fix/social-hq-data-integrity-20261024
+  pull_request:
+    paths:
+      - 'admin/**'
+      - 'tests/**'
+      - '.github/workflows/social-hq-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run five independent app audit passes
+        run: node --test tests/social-hq-audit.test.mjs
+      - name: Install browser test driver
+        run: npm install --no-save --no-package-lock --ignore-scripts playwright-core@1.56.1
+      - name: Run desktop and mobile browser smoke tests
+        run: node --test tests/social-hq-browser.test.mjs
