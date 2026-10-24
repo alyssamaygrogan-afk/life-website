@@ -68,6 +68,36 @@ try{
    await page.locator('[data-page="connections"]').click();
    assert.equal(await page.locator('[data-setup-account="facebook"][data-setup-field="created"]').isChecked(),true);
    assert.equal(await page.getByText('API not connected',{exact:true}).count(),11);
+   // Content approval: require an explicit review and accessible image description.
+   await page.locator('[data-page="posts"]').click();
+   await page.locator('[data-action="newpost"]').first().click();
+   await page.locator('[name="title"]').fill('Social studio quality check');
+   await page.locator('[name="caption"]').fill('L-I-F-E is preparing for January.');
+   await page.locator('[name="status"]').selectOption('Ready');
+   await page.locator('[name="format"]').selectOption('Image');
+   await page.locator('#postform button.btn.primary').click();
+   await page.locator('#postformerror').getByText(/reviewed this version/i).waitFor();
+   await page.locator('[name="reviewed"]').check();
+   await page.locator('#postform button.btn.primary').click();
+   await page.locator('#postformerror').getByText(/alt text/i).waitFor();
+   await page.locator('[name="altText"]').fill('Rainbow infinity logo on a white background');
+   await page.locator('#postform button.btn.primary').click();
+   await page.getByText('Social studio quality check',{exact:true}).first().waitFor();
+   // Paid media never spends and approved status requires manual sign-off.
+   await page.locator('[data-page="campaigns"]').click();
+   await page.getByText('Paid advertising plans').waitFor();
+   await page.locator('[data-action="newad"]').click();
+   await page.locator('[name="name"]').fill('MK launch awareness');
+   await page.locator('[name="budget"]').fill('175');
+   await page.locator('[name="status"]').selectOption('Approved plan');
+   await page.locator('#adform button.btn.primary').click();
+   await page.locator('#aderror').getByText(/external budget approval/i).waitFor();
+   await page.locator('[name="planApproved"]').check();
+   await page.locator('#adform button.btn.primary').click();
+   await page.getByText('MK launch awareness',{exact:true}).waitFor();
+   await page.getByText('Proposed £175.00').waitFor();
+   await page.locator('[data-page="reports"]').click();
+   await page.getByText('Results entered by you').waitFor();
    assert.deepEqual(errors,[]);
    await context.close();
   });

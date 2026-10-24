@@ -45,3 +45,16 @@ Facebook Page, Instagram, Threads, TikTok, YouTube, LinkedIn Page, Pinterest, Me
 - The current free ticket reservation form is already publicly available separately on the homepage. It is **not** a paid presale. Any optional donation or paid ticket needs separate approval and accurately published terms.
 - A separate ChatGPT weekly reminder provides Monday nudges; **this static website itself does not provide push notifications**. Reminders and browser drafts do not depend on a social media connection.
 - Device-local encrypted data stays in the existing `life-hq-device-v1` format; the original password still unlocks the user's drafts. Future cloud sync is not yet available.
+
+## Campaign Studio and competitor-gap improvements (October 2026)
+
+This version adds:
+
+- Post editor with intended Facebook/Instagram/TikTok/LinkedIn/Threads/YouTube/Pinterest targets, creative format and asset reference. These are planning-only fields; no accounts are connected.
+- Image alternative text and explicit review acknowledgement; a post cannot move to Ready/Scheduled manually/Published unless the relevant local review checks pass. Marking Published additionally requires confirming a post was made outside this app.
+- A gated **3 December 2026** venue/ticket reveal checklist with actual venue confirmation, approved booking link and approved ticket information; this is a self-attestation stored in the local encrypted workspace, not verified approval from trustees or external services.
+- Searchable/filterable posts, click-to-edit calendar entries and a separate Campaigns/Reports area.
+- Proposed advertising plan budgets and externally reported spend, clearly separated. No spending and no provider activity is possible here.
+- Manually entered post views, clicks/interactions, CSV exports (unencrypted; keep private) and a prioritized [competitive gap review](../docs/SOCIAL-MEDIA-HQ-COMPETITOR-REVIEW-20261024.md).
+
+**Still not supported:** media uploads, actual social network sign-in/publishing, real provider analytics, verified multi-user approvals, ad account writes, Google Drive sync or server-enforced administrator authorization. This update does not change the AES-GCM storage key or encrypted backup format. Keep backups secure before use.
