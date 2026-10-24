@@ -21,3 +21,16 @@ This folder adds `/admin/` to the existing GitHub Pages website. It **does not r
 ## Production plan
 
 Retain the existing separate Cloudflare Access / edge-gated v0.5 development build in private `in-full` project. Configure the real Google Cloud OAuth client for `alyssa-may.grogan@lifeinfullecosystem.org`, verify live Google Drive reads/writes on both devices and set production identity protection before upgrading `/admin/` to the cloud-backed system. Never embed client secrets in a static repo.
+
+## Social and advertising account setup
+
+The `Accounts` tab now contains an encrypted device-local progress checklist and links to the official registration pages for:
+Facebook Page, Instagram, Threads, TikTok, YouTube, LinkedIn Page, Pinterest, Meta Business/Ads, Google Ads, TikTok Business/Ads and LinkedIn Campaign Manager.
+
+- The two checkboxes per provider track **only self-reported setup and 2FA**, not an authorized or tested API connection.
+- All providers accurately remain **API not connected**. No token is collected or stored; no publisher or spending operation is available.
+- The setup progress is inside the same AES-GCM device workspace and encrypted export. It is **not synced between devices**.
+- Use unique platform passwords and provider-hosted sign-in/verification. **Never paste passwords, client secrets, private API tokens or recovery codes into this app, source code, GitHub, or chat.**
+- Use genuine members/admins for Meta and LinkedIn, rather than fake personal profiles. Organizational Pages are distinct public identities but their administrators can still be real personal accounts; use platform roles for delegation.
+- No spending authorization or billing details should be entered until L-I-F-E approves an actual campaign budget.
+- A future protected backend (not static GitHub Pages) and official per-provider OAuth/developer approvals are necessary for posting, analytics and ads.
