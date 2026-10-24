@@ -7,7 +7,7 @@ on:
   pull_request:
     paths:
       - 'admin/**'
-      - 'tests/social-hq-audit.test.mjs'
+      - 'tests/**'
       - '.github/workflows/social-hq-audit.yml'
 
 permissions:
@@ -25,3 +25,7 @@ jobs:
           node-version: '22'
       - name: Run five independent app audit passes
         run: node --test tests/social-hq-audit.test.mjs
+      - name: Install browser test driver
+        run: npm install --no-save --no-package-lock --ignore-scripts playwright-core@1.56.1
+      - name: Run desktop and mobile browser smoke tests
+        run: node --test tests/social-hq-browser.test.mjs
