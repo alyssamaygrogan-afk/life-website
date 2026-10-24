@@ -58,3 +58,7 @@ This version adds:
 - Manually entered post views, clicks/interactions, CSV exports (unencrypted; keep private) and a prioritized [competitive gap review](../docs/SOCIAL-MEDIA-HQ-COMPETITOR-REVIEW-20261024.md).
 
 **Still not supported:** media uploads, actual social network sign-in/publishing, real provider analytics, verified multi-user approvals, ad account writes, Google Drive sync or server-enforced administrator authorization. This update does not change the AES-GCM storage key or encrypted backup format. Keep backups secure before use.
+
+## Manual Buffer publishing shortcut
+
+The Accounts screen now links directly to the official Buffer publishing dashboard. Every saved post also has a Buffer shortcut alongside its existing Copy caption action. This allows the user to paste manually reviewed captions into Buffer once they have created their official L-I-F-E social accounts and connected them there. It is **not a connection**, does not transmit any draft automatically, and does not synchronize posting status. The same manual workflow remains available for features the eventual API does not support. Do not copy unreleased venue details or unapproved paid ticket information.
