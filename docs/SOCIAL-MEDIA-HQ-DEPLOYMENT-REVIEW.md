@@ -30,3 +30,7 @@
 5. Require explicit deployment approval after completing the gates. **Do not put any passwords, client secrets, or OAuth tokens into GitHub.**
 
 No publishing action, login setup, Google Drive write or website deployment has occurred.
+
+## 24 October — v0.3 candidate
+
+A new *downloadable* v0.3 candidate adds stale OAuth callback invalidation, session-generation checks during login and Drive discovery, explicit failed-token revocation, no pre-authorized workspace DOM rendering, scoped mobile Home Screen manifest and iPhone icons. Twelve mocked local Chromium tests passed (the previous eight plus four regressions). JavaScript syntax checks passed. The ZIP remains off the website and outside this PR; no public files or DNS records were changed. Google OAuth client ID and server/edge authorization remain outstanding. The PR remains a review-only draft and **must not be merged as a deployment**.
