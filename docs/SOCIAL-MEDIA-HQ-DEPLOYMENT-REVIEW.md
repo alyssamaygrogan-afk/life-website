@@ -44,3 +44,7 @@ Another **local downloadable** build completed (app source remains in the ZIP, *
 **Validation:** 16/16 mocked Chromium scenarios passed: baseline five, three Drive reliability, four OAuth/PWA and four new sign-out/cloud-refresh regressions. JS syntax checks and ZIP integrity passed. These tests did not use the real Google OAuth app, real Google Drive or actual iPhone Safari. The existing 4 MB Drive workspace cap and best-effort (non-transactional) concurrent write guard remain.
 
 **Still blocking public release:** OAuth web client ID, production server-enforced admin route privacy, real approved-account/Drive tests, phone and desktop acceptance, explicit deployment authorization. The site's public home page and registration form are unchanged.
+
+## 24 October — v0.5 private edge gate
+
+The current candidate now validates individual Drive records before accepting them and includes a fail-closed Cloudflare Worker route package. Local test evidence: 20 mocked Chromium cases and 8 synthetic RS256 Access JWT tests passed, plus JS syntax and ZIP integrity. The Worker code has also been staged for review as a **draft** in the private In Full repository PR #113: https://github.com/alyssamaygrogan-afk/in-full/pull/113. The full app source is **not committed** in that PR; it is in the conversation's v0.5 build package. The public life-website homepage and ticket form remain untouched. No DNS, Access app, Google OAuth client, live sync or admin website deployment is configured. This public-repo draft remains documentation-only.
