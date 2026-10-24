@@ -20,7 +20,7 @@ const makeContext=async(overrides={})=>{
  const key=await webcrypto.subtle.generateKey({name:'AES-GCM',length:256},false,['encrypt','decrypt']);
  const writes=[];
  const ctx={
-  crypto:webcrypto,key,session:0,
+  crypto:webcrypto,key,session:0,STORAGE:'life-hq-device-v1',
   saved:{v:1,salt:Buffer.alloc(16,2).toString('base64')},
   data:{posts:[{id:'post-1',title:'Save the date',caption:'L-I-F-E launch in MK',status:'Draft',date:'2026-10-24',time:'12:00'}],contacts:[]},
   enc:new TextEncoder(),
