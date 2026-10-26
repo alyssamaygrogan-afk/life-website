@@ -543,21 +543,31 @@ function mediaDb(){
 
 async function mediaPut(mediaId,file){
  if(!key)throw Error('Unlock workspace first');
- var mime=file.type||'image/png';
- if(!['image/png','image/jpeg','image/webp'].includes(mime))throw Error('Use a PNG, JPEG or WebP image.');
- if(file.size>8000000||file.size<10)throw Error('Images must be smaller than 8 MB and not empty.');
- if(typeof createImageBitmap==='function'){
-  var picture;try{picture=await createImageBitmap(file);if(picture.width>12000||picture.height>12000)throw Error('Image dimensions too large')}
-  finally{if(picture)picture.close()}
- }
- var raw=await file.arrayBuffer(),iv=crypto.getRandomValues(new Uint8Array(12));
+ if(!file||typeof file.arrayBuffer!=='function')throw Error('Choose an image file saved on this device');
+ if(!Number.isSafeInteger(file.size)||file.size>8000000||file.size<24)throw Error('Each image must be smaller than 8 MB and not empty');
+ // iOS Safari can expose createImageBitmap but reject perfectly valid Files from
+ // its document picker. Check the actual file signature rather than calling it.
+ // This also works offline and avoids allocating a large decoded bitmap.
+ var raw=await file.arrayBuffer(),bytes=new Uint8Array(raw),view=new DataView(raw),mime='';
+ var png=bytes.length>=24&&bytes[0]===137&&bytes[1]===80&&bytes[2]===78&&bytes[3]===71&&bytes[4]===13&&bytes[5]===10&&bytes[6]===26&&bytes[7]===10;
+ var jpeg=bytes.length>=4&&bytes[0]===255&&bytes[1]===216&&bytes[2]===255;
+ var webp=bytes.length>=16&&String.fromCharCode.apply(null,bytes.subarray(0,4))==='RIFF'&&String.fromCharCode.apply(null,bytes.subarray(8,12))==='WEBP';
+ if(png){
+  mime='image/png';
+  var width=view.getUint32(16,false),height=view.getUint32(20,false);
+  if(!width||!height||width>12000||height>12000||width*height>100000000)throw Error('PNG image dimensions are not supported');
+ }else if(jpeg)mime='image/jpeg';
+ else if(webp)mime='image/webp';
+ else throw Error('The selected file is not a valid PNG, JPEG or WebP image');
+ var iv=crypto.getRandomValues(new Uint8Array(12));
  var encrypted=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv},key,raw);
  var db=await mediaDb();
  try{await new Promise(function(resolve,reject){
   var tr=db.transaction('media','readwrite');
   tr.objectStore('media').put({id:mediaId,iv:iv.buffer,encrypted:encrypted,mime:mime});
-  tr.oncomplete=resolve;tr.onerror=function(){reject(tr.error||Error('Could not store artwork'))};tr.onabort=function(){reject(tr.error||Error('Artwork save aborted'))};
+  tr.oncomplete=resolve;tr.onerror=function(){reject(tr.error||Error('Could not store image'))};tr.onabort=function(){reject(tr.error||Error('Image save was interrupted'))};
  })}finally{db.close()}
+ return mime;
 }
 async function mediaGet(mediaId){
  var db=await mediaDb(),entry;
@@ -647,8 +657,8 @@ async function addMediaFiles(files,attach){
  var count=0;
  for(var file of list){
   var mediaId='upload-'+id();
-  await mediaPut(mediaId,file);
-  data.media.push({id:mediaId,name:String(file.name||'Image').slice(0,250),type:file.type||'image/png',size:file.size,altText:'',createdAt:new Date().toISOString(),source:'upload'});
+  var verifiedType=await mediaPut(mediaId,file);
+  data.media.push({id:mediaId,name:String(file.name||'Image').slice(0,250),type:verifiedType,size:file.size,altText:'',createdAt:new Date().toISOString(),source:'upload'});
   if(attach)draftMediaRefs.push('localmedia:'+mediaId);
   count++;
  }
