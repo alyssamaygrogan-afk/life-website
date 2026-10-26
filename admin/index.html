@@ -263,7 +263,7 @@ function posts(){
   var bySearch=!search||[x.title,x.caption,x.date,(x.networks||[]).join(' '),x.topic].join(' ').toLowerCase().includes(search);
   return byStatus&&bySearch;
  }).sort(function(a,b){return (a.date||'9999').localeCompare(b.date||'9999')});
- var out='<div class="tool-tabs" role="tablist" aria-label="Post status">'+['all'].concat(POST_STATUSES).map(function(v){return '<button type="button" role="tab" data-status-tab="'+esc(v)+'" aria-selected="'+String(postFilter===v)+'">'+(v==='all'?'All':esc(v))+' ('+(v==='all'?data.posts.length:data.posts.filter(function(p){return p.status===v}).length)+')</button>'}).join('')+'</div><div class="actions"><button class="btn primary" data-action="newpost">New post</button><button class="btn danger" data-action="trashselected" type="button">Move selected to bin</button><button class="btn" data-action="weekly">Prepare weekly drafts</button><button class="btn" data-action="prompts">Generate countdown drafts</button></div><div class="panel"><h3>Import the seven 26 Oct – 1 Nov drafts and images</h3><p>Select the <strong>LIFE-HQ-week-2026-10-26.json</strong> file and all seven PNG images from your unzipped L-I-F-E package. This replaces only <strong>draft</strong> posts for those seven days. Other posts, contacts and campaigns stay untouched. An encrypted recovery copy is kept on this device first, without opening a JSON file. Your original drafts go to the Recycle Bin. Artwork stays private and encrypted, never sent to Buffer.</p><label class="btn primary">Choose package files<input id="weekpackage" type="file" accept=".json,.png,image/png,application/json" multiple hidden></label><p id="week-import-status" role="status" aria-live="polite" class="muted">iPhone import fix applied · 26 October 2026. Select the JSON file and all seven PNGs together.</p></div>';
+ var out='<div class="tool-tabs" role="tablist" aria-label="Post status">'+['all'].concat(POST_STATUSES).map(function(v){return '<button type="button" role="tab" data-status-tab="'+esc(v)+'" aria-selected="'+String(postFilter===v)+'">'+(v==='all'?'All':esc(v))+' ('+(v==='all'?data.posts.length:data.posts.filter(function(p){return p.status===v}).length)+')</button>'}).join('')+'</div><div class="actions"><button class="btn primary" data-action="newpost">New post</button><button class="btn danger" data-action="trashselected" type="button">Move selected to bin</button><button class="btn" data-action="weekly">Prepare weekly drafts</button><button class="btn" data-action="prompts">Generate countdown drafts</button></div><div class="panel"><h3>Import the seven 26 Oct – 1 Nov drafts and images</h3><p>Upload the new single <strong>L-I-F-E HQ ZIP</strong> directly. You do not need to unzip it. Alternatively select the JSON and seven PNGs together. This replaces only <strong>draft</strong> posts for those seven days. Other posts, contacts and campaigns stay untouched. An encrypted recovery copy is kept on this device first, without opening a JSON file. Your original drafts go to the Recycle Bin. Artwork stays private and encrypted, never sent to Buffer.</p><label class="btn primary">Upload one ZIP file<input id="weekpackagezip" type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden></label><label class="btn">Or select extracted files<input id="weekpackage" type="file" accept=".json,.png,image/png,application/json" multiple hidden></label><p id="week-import-status" role="status" aria-live="polite" class="muted">Choose the new L-I-F-E ZIP package directly from iPhone Files. No unzipping required.</p></div>';
  out+='<div class="panel"><h3>Quick draft inbox</h3><p class="muted">Paste a new caption written here or prepared in ChatGPT. It becomes an unpublished L-I-F-E draft in this device workspace; no automatic publishing or internet sync.</p><label class="field">Draft caption<textarea id="quick-caption" maxlength="10000" rows="4" placeholder="Paste a caption or write a new L-I-F-E post..."></textarea></label><div class="actions"><button type="button" class="btn primary" data-action="quickdraft">Save as new draft</button><button type="button" class="btn" data-action="newpost">Open full editor</button></div></div>';
  out+='<div class="panel"><div class="post-tools"><label>Find a post<input id="postsearch" value="'+esc(postQuery)+'" placeholder="Title, caption or date"></label><label>Filter by status<select id="postfilter"><option value="all">All statuses</option>'+POST_STATUSES.map(function(v){return '<option value="'+esc(v)+'" '+(v===postFilter?'selected':'')+'>'+esc(v)+'</option>'}).join('')+'</select></label></div><p class="muted">Showing '+list.length+' of '+data.posts.length+' posts. Draft and scheduled dates are local planning only.</p></div>';
  out+='<div class="panel">'+(list.length?list.map(function(x){
@@ -539,11 +539,72 @@ q('#body').addEventListener('change',async function(e){
  data.accountSetups[id]=Object.assign({},prior,{[field]:el.checked});
  await save();
 });
+/* Read only small, uncompressed ZIP files containing the official weekly manifest
+   and seven PNG images. Data is processed entirely in the browser, never uploaded. */
+async function unpackLifeHQZip(file){
+ if(!file||typeof file.arrayBuffer!=='function')throw Error('Choose the L-I-F-E ZIP from Files');
+ if(!/\.zip$/i.test(file.name||''))throw Error('This button accepts the new L-I-F-E ZIP file');
+ if(file.size<200||file.size>25000000)throw Error('ZIP must be between 200 bytes and 25 MB');
+ var buffer=await file.arrayBuffer(),v=new DataView(buffer),b=new Uint8Array(buffer);
+ function u16(p){return v.getUint16(p,true)}
+ function u32(p){return v.getUint32(p,true)}
+ function ensure(p,n){if(p<0||n<0||p+n>b.length)throw Error('This ZIP is incomplete or damaged')}
+ function decode(p,n){ensure(p,n);return new TextDecoder('utf-8',{fatal:true}).decode(b.subarray(p,p+n))}
+ function crc32(bytes){
+  var value=0xffffffff;
+  for(var i=0;i<bytes.length;i++){
+   value=(value^bytes[i])>>>0;
+   for(var j=0;j<8;j++)value=((value>>>1)^((value&1)?0xedb88320:0))>>>0;
+  }
+  return (value^0xffffffff)>>>0;
+ }
+ var eocd=-1,lower=Math.max(0,b.length-65557);
+ for(var pos=b.length-22;pos>=lower;pos--){
+  if(u32(pos)===0x06054b50&&pos+22+u16(pos+20)===b.length){eocd=pos;break}
+ }
+ if(eocd<0)throw Error('Cannot read the ZIP ending; download the new package again');
+ if(u16(eocd+4)!==0||u16(eocd+6)!==0)throw Error('Multi-part ZIP files are not supported');
+ var count=u16(eocd+10),centralSize=u32(eocd+12),centralStart=u32(eocd+16);
+ if(count!==8||u16(eocd+8)!==count||centralStart+centralSize>eocd)throw Error('This is not the eight-file L-I-F-E ZIP package');
+ var cursor=centralStart,files=[],seen=new Set(),total=0;
+ for(var i=0;i<count;i++){
+  ensure(cursor,46);
+  if(u32(cursor)!==0x02014b50)throw Error('The ZIP index is corrupt');
+  var flags=u16(cursor+8),method=u16(cursor+10),crc=u32(cursor+16),sizeCompressed=u32(cursor+20),sizeRaw=u32(cursor+24);
+  var nameLen=u16(cursor+28),extraLen=u16(cursor+30),commentLen=u16(cursor+32),localOffset=u32(cursor+42);
+  var recordSize=46+nameLen+extraLen+commentLen;
+  ensure(cursor,recordSize);
+  var filename=decode(cursor+46,nameLen);
+  if(seen.has(filename)||filename.indexOf('/')>=0||filename.indexOf('\\')>=0||!/^(LIFE-HQ-week-2026-10-26\.json|[A-Za-z0-9_-]+\.png)$/.test(filename))throw Error('This ZIP has unexpected or duplicate files');
+  seen.add(filename);
+  if(method!==0||sizeCompressed!==sizeRaw)throw Error('Use the new ZIP named L-I-F-E_HQ_UPLOAD_THIS. Older compressed ZIPs need extraction first');
+  if((flags&1)||sizeRaw>8000000)throw Error('An image is encrypted or too large');
+  total+=sizeRaw;
+  if(total>20000000)throw Error('The ZIP contains too much data');
+  ensure(localOffset,30);
+  if(u32(localOffset)!==0x04034b50)throw Error('A ZIP file header is missing');
+  var localNameLen=u16(localOffset+26),localExtraLen=u16(localOffset+28);
+  var start=localOffset+30+localNameLen+localExtraLen;
+  ensure(start,sizeCompressed);
+  if(decode(localOffset+30,localNameLen)!==filename)throw Error('ZIP file name mismatch');
+  var bytes=b.subarray(start,start+sizeCompressed);
+  if(crc32(bytes)!==crc)throw Error('An image failed its integrity check; download the ZIP again');
+  files.push(new File([bytes],filename,{type:filename.endsWith('.png')?'image/png':'application/json'}));
+  cursor+=recordSize;
+ }
+ if(cursor!==centralStart+centralSize||files.filter(function(f){return f.name.endsWith('.png')}).length!==7||!seen.has('LIFE-HQ-week-2026-10-26.json'))throw Error('The ZIP is missing some of its required files');
+ return files;
+}
 q('#body').addEventListener('change',async function(e){
- if(e.target.id!=='weekpackage')return;
+ if(e.target.id!=='weekpackage'&&e.target.id!=='weekpackagezip')return;
  var control=e.target,files=Array.from(control.files||[]),notice=q('#week-import-status');
  if(notice){notice.textContent='Checking '+files.length+' selected files…';notice.style.color='#354665'}
  try{
+  if(control.id==='weekpackagezip'){
+   if(files.length!==1)throw Error('Select one L-I-F-E ZIP file');
+   if(notice)notice.textContent='Unpacking and verifying the seven images on this phone…';
+   files=await unpackLifeHQZip(files[0]);
+  }
   await importWeekPackage(files);
   if(notice&&notice.isConnected){notice.textContent='Import finished. Check the seven draft posts above.';notice.style.color='#22695f'}
  }catch(err){
