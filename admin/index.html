@@ -594,37 +594,51 @@ function showMediaPreviews(){
  });
 }
 async function importWeekPackage(fileList){
- if(!data||!key)throw Error('Unlock the workspace');
- if(pendingSaves)throw Error('Wait for existing changes to save');
+ if(!data||!key)throw Error('Unlock your L-I-F-E HQ workspace first');
+ if(pendingSaves)throw Error('Finish saving your current work before importing');
  var files=Array.from(fileList||[]),manifests=files.filter(function(f){return f.name==='LIFE-HQ-week-2026-10-26.json'});
- if(manifests.length!==1)throw Error('Select the named JSON manifest together with all seven PNGs');
+ if(manifests.length!==1)throw Error('Unzip the package first, then select its JSON file and all seven PNG images together');
  var pack=JSON.parse(await manifests[0].text());
  if(pack.packageType!=='LIFE-HQ-draft-package'||pack.version!==1||pack.brand!=='L-I-F-E'||pack.weekStart!=='2026-10-26'||pack.weekEnd!=='2026-11-01'||!Array.isArray(pack.posts)||pack.posts.length!==7)throw Error('This is not the correct seven-day L-I-F-E package');
  var expected=['2026-10-26','2026-10-27','2026-10-28','2026-10-29','2026-10-30','2026-10-31','2026-11-01'];
- var mediaFiles={};files.forEach(function(f){if(f.name.endsWith('.png'))mediaFiles[f.name]=f});
- var replacements=pack.posts.map(function(p,i){
-  if(!p||p.date!==expected[i]||p.status!=='Draft'||p.weeklyKey!=='LIFE-WEEK-'+p.date||typeof p.assetRef!=='string'||!/^[a-zA-Z0-9_-]+\.png$/.test(p.assetRef)||!mediaFiles[p.assetRef]||typeof p.caption!=='string'||!p.caption||p.caption.length>10000||typeof p.title!=='string'||p.title.length>150||typeof p.altText!=='string'||!p.altText||!p.platformCaptions||!['Facebook','Instagram','TikTok','LinkedIn'].every(function(n){return typeof p.platformCaptions[n]==='string'&&p.platformCaptions[n].length<=10000}))throw Error('Invalid or missing post or image for '+expected[i]);
-  return {id:'life-package-'+p.date,weeklyKey:p.weeklyKey,title:p.title,date:p.date,time:'',status:'Draft',caption:p.caption,topic:p.topic||'General',format:'Image',networks:['Facebook','Instagram','TikTok','LinkedIn'],assetRef:'localmedia:'+p.weeklyKey,altText:p.altText,platformCaptions:p.platformCaptions,reviewed:false,reviewedAt:'',notes:'Weekly image package — approval needed'};
- });
- var replaced=data.posts.filter(function(p){return p.status==='Draft'&&p.date>='2026-10-26'&&p.date<='2026-11-01'}).length;
- if(!confirm('Download a backup, then replace '+replaced+' existing DRAFT posts dated 26 October–1 November with 7 new drafts and encrypted artwork? Other dates, approved posts, contacts and campaigns stay unchanged.'))return;
- download();
- var prevMedia=data.media.slice();
- for(var p of pack.posts){
-  await mediaPut(p.weeklyKey,mediaFiles[p.assetRef]);
-  if(!data.media.some(function(x){return x.id===p.weeklyKey}))
-   data.media.push({id:p.weeklyKey,name:p.assetRef,type:mediaFiles[p.assetRef].type||'image/png',size:mediaFiles[p.assetRef].size,altText:p.altText,createdAt:new Date().toISOString(),source:'weekly-import'});
+ var mediaFiles={};files.forEach(function(f){if(f.name.toLowerCase().endsWith('.png'))mediaFiles[f.name]=f});
+ var replacements=[],staged=[];
+ for(var i=0;i<7;i++){
+  var p=pack.posts[i],date=expected[i];
+  if(!p||p.date!==date||p.status!=='Draft'||p.weeklyKey!=='LIFE-WEEK-'+date||typeof p.assetRef!=='string'||!/^[a-zA-Z0-9_-]+\.png$/.test(p.assetRef)||!mediaFiles[p.assetRef]||typeof p.caption!=='string'||!p.caption||p.caption.length>10000||typeof p.title!=='string'||p.title.length>150||typeof p.altText!=='string'||!p.altText||!p.platformCaptions||!['Facebook','Instagram','TikTok','LinkedIn'].every(function(n){return typeof p.platformCaptions[n]==='string'&&p.platformCaptions[n].length<=10000}))
+   throw Error('The package is missing the post or image for '+date);
+  var newMediaId='weekly-'+date+'-'+id().slice(0,8);
+  staged.push({id:newMediaId,file:mediaFiles[p.assetRef],name:p.assetRef,altText:p.altText,date:date});
+  replacements.push({id:'life-package-'+date+'-'+id().slice(0,8),weeklyKey:p.weeklyKey,title:p.title,date:p.date,time:'',status:'Draft',caption:p.caption,topic:p.topic||'General',format:'Image',networks:['Facebook','Instagram','TikTok','LinkedIn'],assetRef:'localmedia:'+newMediaId,mediaRefs:['localmedia:'+newMediaId],altText:p.altText,platformCaptions:p.platformCaptions,reviewed:false,reviewedAt:'',notes:'Weekly image package — approval needed'});
  }
- var previous=data.posts.slice();
+ var oldDrafts=data.posts.filter(function(p){return p.status==='Draft'&&p.date>='2026-10-26'&&p.date<='2026-11-01'});
+ if(!await confirmHQ('Replace '+oldDrafts.length+' existing drafts dated 26 October–1 November with seven new posts and their images? Your existing drafts will be kept in the Recycle Bin, and a complete encrypted backup will download first. Nothing will be published.','Import seven drafts'))return;
+ await downloadFullBackup();
+ var originalPosts=data.posts.slice(),originalMedia=(data.media||[]).slice(),originalTrash=(data.trash||[]).slice(),written=[];
+ var label='Importing L-I-F-E images';
  try{
-  data.posts.filter(function(p){return p.status==='Draft'&&p.date>='2026-10-26'&&p.date<='2026-11-01'}).forEach(function(p){moveToTrash('post',p.id)});
+  for(var j=0;j<staged.length;j++){
+   label='Importing image '+(j+1)+' of '+staged.length;
+   info(label);
+   var asset=staged[j],type=await mediaPut(asset.id,asset.file);
+   written.push(asset.id);
+   data.media.push({id:asset.id,name:asset.name,type:type,size:asset.file.size,altText:asset.altText,createdAt:new Date().toISOString(),source:'weekly-import'});
+  }
+  oldDrafts.forEach(function(p){moveToTrash('post',p.id)});
   data.posts=data.posts.concat(replacements);
   validateWorkspace(data);
-  if(!await save())throw Error('Encrypted workspace save failed');
-  navigate('posts');info('Seven L-I-F-E image drafts imported. Nothing published.');
- }catch(err){data.posts=previous;data.media=prevMedia;throw err}
+  if(!await save({skipRender:true}))throw Error('Could not save the encrypted replacement drafts');
+  navigate('posts');
+  info('Seven illustrated L-I-F-E drafts imported successfully. Nothing published.');
+ }catch(err){
+  // Roll back the entire import, including new artwork, so retries are safe.
+  data.posts=originalPosts;data.media=originalMedia;data.trash=originalTrash;
+  for(var mediaId of written){
+   try{await mediaRemove(mediaId)}catch(cleanupError){console.warn('Could not clean up a temporary image',cleanupError)}
+  }
+  throw Error(label+': '+err.message+'. Your previous drafts were kept.');
+ }
 }
-
 q('#body').addEventListener('change',async function(e){if(e.target.id!=='backupfile'||!e.target.files.length)return;try{var file=e.target.files[0];if(file.size>6000000)throw Error('Backup too large');var r=JSON.parse(await file.text());if(pendingSaves)throw Error('Wait until the current save finishes');if(!confirm('Replace all local workspace data with this backup?'))return;var p=prompt('Enter the password used for this backup');if(!p)return;var output=await decrypt(p,r);localStorage.setItem(STORAGE,JSON.stringify(r));session++;key=output.key;saved=r;data=output.data;data.trash=data.trash||[];data.media=data.media||[];data.brand=data.brand||{};lastSaveFailed=false;await forgetThisDevice();applyBrand();render();info('Posts-only backup restored. Images require a complete backup.')}catch(err){info('Backup could not be restored')}})
 
 
