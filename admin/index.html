@@ -97,6 +97,31 @@ function validateWorkspace(d){
   if(v.venueApproved!==undefined&&typeof v.venueApproved!=='boolean')throw Error('Invalid venue check');
   if(v.ticketsApproved!==undefined&&typeof v.ticketsApproved!=='boolean')throw Error('Invalid tickets check');
  }
+ if(d.media!==undefined){
+   if(!Array.isArray(d.media)||d.media.length>5000)throw Error('Invalid media library');
+   for(var m of d.media){
+    if(!m||typeof m!=='object'||!isText(m.id,300)||!m.id||!isText(m.name,300)||!isText(m.type,80)||!['image/png','image/jpeg','image/webp'].includes(m.type)||!Number.isSafeInteger(m.size)||m.size<0||m.size>8000000)throw Error('Invalid media entry');
+    if(m.altText!==undefined&&!isText(m.altText,2000))throw Error('Invalid image description');
+   }
+ }
+ if(d.trash!==undefined){
+  if(!Array.isArray(d.trash)||d.trash.length>15000)throw Error('Invalid recycle bin');
+  for(var deleted of d.trash){
+   if(!deleted||!isText(deleted.id,150)||!['post','contact','plan','media'].includes(deleted.kind)||!deleted.record||typeof deleted.record!=='object'||!isText(deleted.deletedAt,100))throw Error('Invalid deleted record');
+  }
+ }
+ if(d.brand!==undefined){
+  if(!d.brand||typeof d.brand!=='object'||Array.isArray(d.brand))throw Error('Invalid brand settings');
+  for(var n of ['font','accent','hashtags','voice'])if(d.brand[n]!==undefined&&!isText(d.brand[n],2000))throw Error('Invalid brand field');
+  if(d.brand.uiScale!==undefined&&(!Number.isFinite(d.brand.uiScale)||d.brand.uiScale<0.85||d.brand.uiScale>1.3))throw Error('Invalid text scale');
+ }
+ for(var post of d.posts){
+  if(post.mediaRefs!==undefined&&(!Array.isArray(post.mediaRefs)||post.mediaRefs.length>8||!post.mediaRefs.every(function(ref){return isText(ref,400)})))throw Error('Invalid post media');
+  if(post.platformCaptions!==undefined){
+   if(!post.platformCaptions||typeof post.platformCaptions!=='object'||Array.isArray(post.platformCaptions))throw Error('Invalid caption adaptations');
+   for(var channel of ['Facebook','Instagram','TikTok','LinkedIn'])if(post.platformCaptions[channel]!==undefined&&!isText(post.platformCaptions[channel],10000))throw Error('Invalid platform caption');
+  }
+ }
  if(d.adPlans!==undefined){
   if(!Array.isArray(d.adPlans)||d.adPlans.length>2000)throw Error('Invalid advertising plans');
   for(var ad of d.adPlans){
@@ -207,6 +232,7 @@ function posts(){
   return byStatus&&bySearch;
  }).sort(function(a,b){return (a.date||'9999').localeCompare(b.date||'9999')});
  var out='<div class="tool-tabs" role="tablist" aria-label="Post status">'+['all'].concat(POST_STATUSES).map(function(v){return '<button type="button" role="tab" data-status-tab="'+esc(v)+'" aria-selected="'+String(postFilter===v)+'">'+(v==='all'?'All':esc(v))+' ('+(v==='all'?data.posts.length:data.posts.filter(function(p){return p.status===v}).length)+')</button>'}).join('')+'</div><div class="actions"><button class="btn primary" data-action="newpost">New post</button><button class="btn danger" data-action="trashselected" type="button">Move selected to bin</button><button class="btn" data-action="weekly">Prepare weekly drafts</button><button class="btn" data-action="prompts">Generate countdown drafts</button></div><div class="panel"><h3>Import the seven 26 Oct – 1 Nov drafts and images</h3><p>Select the <strong>LIFE-HQ-week-2026-10-26.json</strong> file and all seven PNG images from your unzipped L-I-F-E package. This replaces only <strong>draft</strong> posts for those seven days. Other posts, contacts and campaigns stay untouched. An encrypted backup downloads first. Artwork is stored encrypted on this device, not sent to Buffer.</p><label class="btn primary">Choose package files<input id="weekpackage" type="file" accept=".json,.png,image/png,application/json" multiple hidden></label></div>';
+ out+='<div class="panel"><h3>Quick draft inbox</h3><p class="muted">Paste a new caption written here or prepared in ChatGPT. It becomes an unpublished L-I-F-E draft in this device workspace; no automatic publishing or internet sync.</p><label class="field">Draft caption<textarea id="quick-caption" maxlength="10000" rows="4" placeholder="Paste a caption or write a new L-I-F-E post..."></textarea></label><div class="actions"><button type="button" class="btn primary" data-action="quickdraft">Save as new draft</button><button type="button" class="btn" data-action="newpost">Open full editor</button></div></div>';
  out+='<div class="panel"><div class="post-tools"><label>Find a post<input id="postsearch" value="'+esc(postQuery)+'" placeholder="Title, caption or date"></label><label>Filter by status<select id="postfilter"><option value="all">All statuses</option>'+POST_STATUSES.map(function(v){return '<option value="'+esc(v)+'" '+(v===postFilter?'selected':'')+'>'+esc(v)+'</option>'}).join('')+'</select></label></div><p class="muted">Showing '+list.length+' of '+data.posts.length+' posts. Draft and scheduled dates are local planning only.</p></div>';
  out+='<div class="panel">'+(list.length?list.map(function(x){
   var intended=Array.isArray(x.networks)&&x.networks.length?x.networks.join(', '):'Choose platforms';
@@ -782,6 +808,19 @@ function confirmHQ(message,actionLabel){
   dialog.querySelector('[data-confirm-no]').focus();
  });
 }
+
+
+q('#body').addEventListener('click',async function(e){
+ var b=e.target.closest('button');if(!b||b.dataset.action!=='quickdraft'||!data)return;
+ var field=q('#quick-caption'),caption=field&&field.value.trim();
+ if(!caption)return info('Write or paste a caption first');
+ if(caption.length>10000)return info('Caption is too long');
+ var title=caption.split('\n')[0].trim().slice(0,100)||'New L-I-F-E draft';
+ // Users control release: pasted text is always a private draft, never approved.
+ var p={id:id(),title:title,date:'',time:'',status:'Draft',caption:caption,topic:'General',format:'Text',networks:['Facebook','Instagram','TikTok','LinkedIn'],reviewed:false,reviewedAt:'',createdAt:new Date().toISOString()};
+ data.posts.push(p);
+ if(await save()){editing=p.id;navigate('post');info('New private draft added — add images and review before scheduling')}
+});
 
 /* Recycle bin stores original records inside the encrypted workspace. */
 function moveToTrash(kind,ref){
