@@ -673,6 +673,57 @@ q('#body').addEventListener('dragover',function(e){if(e.target.closest('#media-d
 q('#body').addEventListener('dragleave',function(e){if(e.target.closest('#media-drop'))q('#media-drop').classList.remove('dragover')});
 q('#body').addEventListener('drop',async function(e){if(!e.target.closest('#media-drop'))return;e.preventDefault();q('#media-drop').classList.remove('dragover');try{await addMediaFiles(e.dataTransfer.files,false)}catch(err){alert(err.message)}});
 
+
+function brandStudio(){
+ var b=data.brand||{},font=['system','rounded','serif'].includes(b.font)?b.font:'system';
+ var scale=Math.max(85,Math.min(130,Math.round((Number(b.uiScale)||1)*100)));
+ var accent=/^#[0-9a-fA-F]{6}$/.test(b.accent||'')?b.accent:'#6354bb';
+ return '<div class="panel hero"><h3>✦ L-I-F-E Brand Studio</h3><p>Keep posts, colours and language recognisably L-I-F-E. Set your dashboard typography, colour and reusable wording.</p></div>'
+ +'<div class="panel"><div class="theme-preview"><div style="font-size:35px;font-weight:900;letter-spacing:.1em">L-I-F-E <span style="background:var(--hq-rainbow);background-clip:text;color:transparent">∞</span></div><p>Living IN FULL Ecosystem</p><div class="brand-rainbow"></div><p>HONESTY · EQUALITY · LEARNING · PROTECTION</p><strong>30 JANUARY 2027 | 3 PM</strong></div></div>'
+ +'<div class="panel"><h3>Fonts, colour and layout</h3><form id="brandform"><div class="brand-settings"><label class="field">Font style<select name="brandFont"><option value="system" '+(font==='system'?'selected':'')+'>Clean modern</option><option value="rounded" '+(font==='rounded'?'selected':'')+'>Friendly rounded</option><option value="serif" '+(font==='serif'?'selected':'')+'>Classic serif</option></select></label><label class="field">Interface accent<input name="brandAccent" type="color" value="'+esc(accent)+'"></label><label class="field">Text size <output id="brand-scale-value">'+scale+'%</output><div class="range-row"><input name="brandScale" type="range" min="85" max="130" step="5" value="'+scale+'"></div></label></div>'
+ +'<label class="field">Default hashtags<textarea name="brandHashtags" maxlength="500">'+esc(b.hashtags||'#LIFE2027 #LivingINFull #MiltonKeynes')+'</textarea></label><label class="field">Brand voice and messaging notes<textarea name="brandVoice" maxlength="1500">'+esc(b.voice||'Warm, honest, inclusive and accessible. Keep the three detailed missions for launch day. Do not reveal the venue or paid ticket terms before verified authorization.')+'</textarea></label><p class="muted">Fonts and accent change the HQ interface. To make an actual social-media graphic, use “Generate branded square” in the post editor or upload official artwork.</p><button class="btn primary">Save brand settings</button></form></div>'
+ +'<div class="panel"><h3>Quick draft templates</h3><p class="muted">Every template creates an unpublished draft. Review the wording before using it publicly.</p><div class="actions"><button class="btn" data-template="countdown">Countdown</button><button class="btn" data-template="belonging">Belonging & inclusion</button><button class="btn" data-template="miltonkeynes">Milton Keynes launch</button></div></div>';
+}
+function useCaptionTab(platform){
+ if(!['Facebook','Instagram','TikTok','LinkedIn'].includes(platform))return;
+ activeCaptionPlatform=platform;
+ document.querySelectorAll('[data-caption-pane]').forEach(function(el){el.hidden=el.dataset.captionPane!==platform});
+ document.querySelectorAll('[data-caption-tab]').forEach(function(el){var on=el.dataset.captionTab===platform;el.classList.toggle('active',on);el.setAttribute('aria-selected',String(on))});
+ var name=platform==='Facebook'?'caption':'platform_'+platform,field=q('#postform [name="'+name+'"]');if(field)field.focus();
+}
+function insertIntoCaption(value){
+ var name=activeCaptionPlatform==='Facebook'?'caption':'platform_'+activeCaptionPlatform;
+ var field=q('#postform [name="'+name+'"]');if(!field)return;
+ var first=field.selectionStart||0,last=field.selectionEnd||0;
+ var a=field.value.slice(0,first),b=field.value.slice(last),delimiter=a&&!/\s$/.test(a)?' ':'';
+ var addition=delimiter+value+(b&&/^\S/.test(b)?' ':'');
+ field.value=(a+addition+b).slice(0,10000);
+ var pos=Math.min(10000,a.length+addition.length);field.focus();field.setSelectionRange(pos,pos);
+ field.dispatchEvent(new Event('input',{bubbles:true}));
+}
+q('#body').addEventListener('click',async function(e){
+ var b=e.target.closest('button');if(!b)return;
+ if(b.dataset.captionTab){useCaptionTab(b.dataset.captionTab);return}
+ if(b.dataset.insertText){insertIntoCaption(b.dataset.insertText);return}
+ if(b.dataset.template){
+  var options={
+   countdown:{title:'Countdown to the L-I-F-E launch',caption:'🌈 The countdown continues! L-I-F-E launches on 30 January 2027 at 3 PM in Milton Keynes. Follow our journey. #LIFE2027 #LivingINFull'},
+   belonging:{title:'Everyone deserves to belong',caption:'💜 Different lives. Equal worth. Everyone deserves dignity, respect and the opportunity to live IN FULL. 🌈 #LivingINFull #LIFE2027'},
+   miltonkeynes:{title:'Milton Keynes — a new beginning',caption:'📍 Milton Keynes is where the L-I-F-E journey begins. Join us as we count down to 30 January 2027! 🌈 #LIFE2027 #MiltonKeynes'}
+  },p=options[b.dataset.template];if(!p)return;
+  editing=null;navigate('post');var f=q('#postform');f.elements.title.value=p.title;f.elements.caption.value=p.caption;f.elements.status.value='Draft';f.elements.topic.value='Countdown';
+ }
+});
+q('#body').addEventListener('submit',async function(e){
+ if(e.target.id!=='brandform')return;
+ e.preventDefault();
+ var f=new FormData(e.target),font=String(f.get('brandFont')),accent=String(f.get('brandAccent')),scale=Number(f.get('brandScale'));
+ if(!['system','rounded','serif'].includes(font)||!/^#[0-9a-fA-F]{6}$/.test(accent)||!Number.isInteger(scale)||scale<85||scale>130)return info('Please choose valid brand settings');
+ data.brand={font:font,accent:accent,uiScale:scale/100,hashtags:String(f.get('brandHashtags')).trim().slice(0,500),voice:String(f.get('brandVoice')).trim().slice(0,1500)};
+ applyBrand();await save();
+});
+q('#body').addEventListener('input',function(e){if(e.target.name==='brandScale'){var out=q('#brand-scale-value');if(out)out.textContent=e.target.value+'%'}});
+
 /* Recycle bin stores original records inside the encrypted workspace. */
 function moveToTrash(kind,ref){
  var groups={post:'posts',contact:'contacts',plan:'adPlans',media:'media'},field=groups[kind];
