@@ -655,10 +655,20 @@ function formProblem(selector,message){
 }
 /* Any edit must be reviewed again. Reopening a saved approval alone leaves it intact. */
 function approvalFields(p){
- return JSON.stringify({title:p.title,date:p.date,time:p.time,status:p.status,caption:p.caption,
-  platformCaptions:p.platformCaptions,topic:p.topic,format:p.format,
-  networks:p.networks,mediaRefs:p.mediaRefs,assetRef:p.assetRef,altText:p.altText,
-  ctaUrl:p.ctaUrl,publishedUrl:p.publishedUrl});
+ /* Normalize legacy drafts, which may not yet have platformCaptions/mediaRefs. */
+ var captions=p.platformCaptions||{},ref=String(p.assetRef||'');
+ return JSON.stringify({
+  title:String(p.title||''),date:String(p.date||''),time:String(p.time||'12:00'),
+  status:String(p.status||'Draft'),caption:String(p.caption||''),
+  platformCaptions:{Facebook:String(captions.Facebook||p.caption||''),
+   Instagram:String(captions.Instagram||''),TikTok:String(captions.TikTok||''),
+   LinkedIn:String(captions.LinkedIn||'')},
+  topic:String(p.topic||'General'),format:String(p.format||'Text'),
+  networks:Array.isArray(p.networks)?p.networks:[],
+  mediaRefs:Array.isArray(p.mediaRefs)?p.mediaRefs:(ref.startsWith('localmedia:')?[ref]:[]),
+  assetRef:ref,altText:String(p.altText||''),ctaUrl:String(p.ctaUrl||''),
+  publishedUrl:String(p.publishedUrl||'')
+ });
 }
 q('#body').addEventListener('input',function(e){
  var form=e.target.closest&&e.target.closest('#postform');
