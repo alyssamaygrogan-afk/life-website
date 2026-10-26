@@ -74,8 +74,8 @@ async function unseal(value,env){
 }
 async function metaGet(path,token,env){
   const u=new URL('https://graph.facebook.com/'+version(env)+'/'+path);
-  u.searchParams.set('access_token',token);
-  const res=await fetch(u,{headers:{'Accept':'application/json'}});
+  // Keep the Page access token out of query strings and most URL logs.
+  const res=await fetch(u,{headers:{'Accept':'application/json','Authorization':'Bearer '+token}});
   const body=await res.json().catch(()=>({}));
   if(!res.ok||body.error)throw Error('Meta Graph API error: '+(body.error&&body.error.message||'request rejected'));
   return body;
@@ -167,6 +167,7 @@ export default {
         login.searchParams.set('redirect_uri',env.META_REDIRECT_URI);
         login.searchParams.set('state',state);
         login.searchParams.set('scope',SCOPES);
+        if(env.META_LOGIN_CONFIG_ID)login.searchParams.set('config_id',env.META_LOGIN_CONFIG_ID);
         login.searchParams.set('response_type','code');
         return reply({service:'life-hq-meta-bridge',url:login.href,flow,expiresInSeconds:600},200,env,origin);
       }
@@ -179,7 +180,7 @@ export default {
       }
       if(u.pathname==='/select'&&request.method==='POST'){
         const body=await jsonBody(request),flow=String(body.flow||''),pageId=String(body.pageId||'');
-        if(!/^[A-Za-z0-9_-]{43}$/.test(flow)||!/^\\d{5,30}$/.test(pageId))return reply({error:'Invalid Meta Page selection'},400,env,origin);
+        if(!/^[A-Za-z0-9_-]{43}$/.test(flow)||!/^\d{5,30}$/.test(pageId))return reply({error:'Invalid Meta Page selection'},400,env,origin);
         const pages=await unseal(await env.META_KV.get('pending:'+flow),env);
         const page=pages&&pages.find(p=>p.id===pageId);
         if(!page)return reply({error:'That Page is unavailable or the connection attempt expired'},404,env,origin);
