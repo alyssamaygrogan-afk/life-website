@@ -271,14 +271,14 @@ function posts(){
   var intended=Array.isArray(x.networks)&&x.networks.length?x.networks.join(', '):'Choose platforms';
   var visual=x.format==='Image'||x.format==='Carousel';
   var reviewMissing=isPublicStatus(x.status)&&x.reviewed!==true;
-  return '<div class="row"><label class="setup-check"><input type="checkbox" data-select-post="'+esc(x.id)+'" '+(selectedPostIds.has(x.id)?'checked':'')+'> Select</label><h3>'+esc(x.title)+'</h3><span class="tag">'+esc(x.status)+'</span> <small>'+esc(x.date||'Date not set')+' · '+esc(x.time||'')+'</small><div class="post-metrics"><span>'+esc(intended)+'</span><span>'+esc(x.format||'Text')+'</span><span>'+esc(x.topic||'General')+'</span></div><p>'+esc(x.caption).slice(0,330)+'</p>'+(visual&&!x.altText?'<p class="danger-text">Image description missing</p>':'')+(reviewMissing?'<p class="danger-text">Approval needs reviewing in this version</p>':'')+(x.assetRef&&x.assetRef.startsWith('localmedia:')?'<div><img data-hq-media="'+esc(x.assetRef.slice(11))+'" alt="'+esc(x.altText||'L-I-F-E artwork')+'" style="width:155px;max-width:100%;height:auto;aspect-ratio:1;object-fit:contain;border-radius:9px;background:#000"></div>':'')+'<div class="actions"><button class="btn" data-edit="'+esc(x.id)+'">Edit</button><button class="btn" data-duplicate="'+esc(x.id)+'">Duplicate</button><button class="btn danger" data-trash-post="'+esc(x.id)+'">Bin</button><button class="btn" data-copy="'+esc(x.id)+'">Copy Facebook</button>'+(x.platformCaptions?['Instagram','TikTok','LinkedIn'].map(function(n){return '<button class="btn" data-copy-platform="'+esc(n)+'" data-post-id="'+esc(x.id)+'">Copy '+esc(n)+'</button>'}).join(''):'')+'<button class="btn primary" type="button" data-share-buffer="'+esc(x.id)+'">Share post (choose Buffer)</button></div><p class="muted">Choose Buffer in the iPhone share sheet, then verify the caption and artwork. Nothing is scheduled automatically.</p></div>';
+  return '<div class="row"><label class="setup-check"><input type="checkbox" data-select-post="'+esc(x.id)+'" '+(selectedPostIds.has(x.id)?'checked':'')+'> Select</label><h3>'+esc(x.title)+'</h3><span class="tag">'+esc(x.status)+'</span> <span class="tag">'+(x.reviewed===true?'✓ Review saved':'Review pending')+'</span> <small>'+esc(x.date||'Date not set')+' · '+esc(x.time||'')+'</small><div class="post-metrics"><span>'+esc(intended)+'</span><span>'+esc(x.format||'Text')+'</span><span>'+esc(x.topic||'General')+'</span></div><p>'+esc(x.caption).slice(0,330)+'</p>'+(visual&&!x.altText?'<p class="danger-text">Image description missing</p>':'')+(reviewMissing?'<p class="danger-text">Approval needs reviewing in this version</p>':'')+(x.assetRef&&x.assetRef.startsWith('localmedia:')?'<div><img data-hq-media="'+esc(x.assetRef.slice(11))+'" alt="'+esc(x.altText||'L-I-F-E artwork')+'" style="width:155px;max-width:100%;height:auto;aspect-ratio:1;object-fit:contain;border-radius:9px;background:#000"></div>':'')+'<div class="actions"><button class="btn" data-edit="'+esc(x.id)+'">Edit</button><button class="btn" data-duplicate="'+esc(x.id)+'">Duplicate</button><button class="btn danger" data-trash-post="'+esc(x.id)+'">Bin</button><button class="btn" data-copy="'+esc(x.id)+'">Copy Facebook</button>'+(x.platformCaptions?['Instagram','TikTok','LinkedIn'].map(function(n){return '<button class="btn" data-copy-platform="'+esc(n)+'" data-post-id="'+esc(x.id)+'">Copy '+esc(n)+'</button>'}).join(''):'')+'<button class="btn primary" type="button" data-share-buffer="'+esc(x.id)+'">Share post (choose Buffer)</button></div><p class="muted">Choose Buffer in the iPhone share sheet, then verify the caption and artwork. Nothing is scheduled automatically.</p></div>';
  }).join(''):'No matching posts. Try another filter or create a draft.')+'</div>';
  return out;
 }
 function postForm(){
  var x=data.posts.find(function(p){return p.id===editing})||{title:'',date:'',time:'12:00',status:'Draft',caption:'',networks:['Facebook','Instagram'],topic:'General',format:'Text'};
  var networks=Array.isArray(x.networks)?x.networks:[];
- return '<div class="panel"><h3>'+(editing?'Edit':'New')+' post</h3><p class="status-note">Use this editor to prepare content for L-I-F-E accounts. Nothing publishes or reaches any advertising account automatically. Approvals below are local confirmations, not verified trustee approvals.</p><form id="postform" class="twocol"><label class="field">Title<input name="title" required maxlength="120" value="'+esc(x.title)+'"></label><label class="field">Planned date<input type="date" name="date" value="'+esc(x.date||'')+'"></label><label class="field">UK time<input type="time" name="time" value="'+esc(x.time||'12:00')+'"></label><label class="field">Status<select name="status">'+POST_STATUSES.map(function(v){return '<option value="'+v+'" '+(v===x.status?'selected':'')+'>'+v+(v==='Published'?' (manual confirmation)':'')+'</option>'}).join('')+'</select></label>'
+ return '<div class="panel"><h3>'+(editing?'Edit':'New')+' post</h3><p class="status-note">Use this editor to prepare content for L-I-F-E accounts. Approving saves only inside this device: nothing is sent to Buffer or published automatically.</p><form id="postform" class="twocol"><p class="full status-note" id="approval-persisted" role="status">'+(x.reviewed===true?'<strong>Review saved.</strong> This version was approved locally'+(x.reviewedAt?' on '+esc(new Date(x.reviewedAt).toLocaleString('en-GB')):'')+'. Any edit needs a fresh approval.':'<strong>Awaiting approval.</strong> Choose Ready, review all details, tick the confirmation and Save post.')+'</p><p class="form-error full hidden" id="postformtoperror" role="alert"></p><label class="field">Title<input name="title" required maxlength="120" value="'+esc(x.title)+'"></label><label class="field">Planned date<input type="date" name="date" value="'+esc(x.date||'')+'"></label><label class="field">UK time<input type="time" name="time" value="'+esc(x.time||'12:00')+'"></label><label class="field">Status<select name="status">'+POST_STATUSES.map(function(v){return '<option value="'+v+'" '+(v===x.status?'selected':'')+'>'+v+(v==='Published'?' (manual confirmation)':'')+'</option>'}).join('')+'</select></label>'
  +'<label class="field">Campaign topic<select name="topic">'+TOPICS.map(function(v){return '<option '+(v===(x.topic||'General')?'selected':'')+'>'+esc(v)+'</option>'}).join('')+'</select></label><label class="field">Content format<select name="format">'+FORMATS.map(function(v){return '<option '+(v===(x.format||'Text')?'selected':'')+'>'+v+'</option>'}).join('')+'</select></label>'
  +'<fieldset class="channels full"><legend>Intended social platforms — not connected</legend><div class="channel-options">'+CHANNELS.map(function(v){return '<label><input type="checkbox" name="networks" value="'+v+'" '+(networks.includes(v)?'checked':'')+'>'+v+'</label>'}).join('')+'</div></fieldset>'
  +'<div class="full"><h3>Platform captions</h3><p class="muted">Edit each platform separately. Nothing is published automatically.</p><div class="composer-tabs" role="tablist">'+['Facebook','Instagram','TikTok','LinkedIn'].map(function(n){return '<button type="button" data-caption-tab="'+n+'" class="'+(activeCaptionPlatform===n?'active':'')+'" aria-selected="'+String(activeCaptionPlatform===n)+'">'+n+'</button>'}).join('')+'</div><div class="emoji-toolbar" aria-label="Insert emoji or hashtag">'+['🌈','💜','✨','🌍','♾️','🤝','💛','🎉','#LIFE2027','#LivingINFull','#MiltonKeynes'].map(function(em){return '<button type="button" data-insert-text="'+esc(em)+'" aria-label="Insert '+esc(em)+'">'+esc(em)+'</button>'}).join('')+'</div></div>'
@@ -288,7 +288,7 @@ function postForm(){
  +'<label class="field full">Call-to-action link <span class="form-hint">(https only; check the destination)</span><input name="ctaUrl" type="url" maxlength="2000" placeholder="https://lifeinfullecosystem.org/" value="'+esc(x.ctaUrl||'')+'"></label>'
  +'<label class="field full">External published post link <span class="form-hint">(only after posting manually)</span><input name="publishedUrl" type="url" maxlength="2000" value="'+esc(x.publishedUrl||'')+'"></label>'
  +'<fieldset class="channels full"><legend>Manual performance numbers (optional)</legend><div class="twocol"><label class="field">Views<input type="number" name="views" min="0" step="1" max="1000000000" value="'+esc(x.views??'')+'"></label><label class="field">Link clicks<input type="number" name="clicks" min="0" step="1" max="1000000000" value="'+esc(x.clicks??'')+'"></label><label class="field">Interactions<input type="number" name="interactions" min="0" step="1" max="1000000000" value="'+esc(x.interactions??'')+'"></label></div><p class="muted">Type figures copied from the actual platform. No account analytics are connected.</p></fieldset>'
- +'<label class="setup-check full"><input type="checkbox" name="reviewed"> I have reviewed this current draft, checked its facts, consent, accessibility and links.</label>'
+ +'<label class="setup-check full"><input type="checkbox" name="reviewed" '+(x.reviewed===true?'checked':'')+'> I have reviewed this current draft, checked its facts, consent, accessibility and links.</label>'
  +'<label class="setup-check full"><input type="checkbox" name="postedExternally"> I personally confirm this was published outside L-I-F-E Social Media HQ.</label>'
  +'<p class="form-error full hidden" id="postformerror" role="alert"></p>'
  +'<div class="actions full"><button class="btn primary">Save post</button><button class="btn" type="button" data-action="posts">Cancel</button>'+(editing?'<button class="btn danger" type="button" data-action="deletepost">Move to bin</button>':'')+'</div></form></div>';
@@ -644,8 +644,49 @@ function gbpNumber(raw){
  return Math.round((n+Number.EPSILON)*100)/100;
 }
 function formProblem(selector,message){
- var el=q(selector);if(el){el.textContent=message;el.classList.remove('hidden')}return false;
+ var el=q(selector);
+ if(el){el.textContent=message;el.classList.remove('hidden')}
+ if(selector==='#postformerror'){
+  var top=q('#postformtoperror');
+  if(top){top.textContent=message;top.classList.remove('hidden');top.scrollIntoView({behavior:'smooth',block:'center'});}
+ }
+ info('Not saved: '+message.slice(0,160));
+ return false;
 }
+/* Any edit must be reviewed again. Reopening a saved approval alone leaves it intact. */
+function approvalFields(p){
+ return JSON.stringify({title:p.title,date:p.date,time:p.time,status:p.status,caption:p.caption,
+  platformCaptions:p.platformCaptions,topic:p.topic,format:p.format,
+  networks:p.networks,mediaRefs:p.mediaRefs,assetRef:p.assetRef,altText:p.altText,
+  ctaUrl:p.ctaUrl,publishedUrl:p.publishedUrl});
+}
+q('#body').addEventListener('input',function(e){
+ var form=e.target.closest&&e.target.closest('#postform');
+ if(!form||e.target.name==='reviewed'||e.target.name==='postedExternally')return;
+ var approval=form.querySelector('[name="reviewed"]');
+ if(approval&&approval.checked){
+  approval.checked=false;
+  var note=q('#approval-persisted');
+  if(note)note.textContent='Post changed. Re-check the review box after checking the updated content.';
+ }
+ form.dataset.reviewedConfirmed='';
+});
+q('#body').addEventListener('change',function(e){
+ var form=e.target.closest&&e.target.closest('#postform');
+ if(!form)return;
+ if(e.target.name==='reviewed'){
+  if(e.target.checked)form.dataset.reviewedConfirmed='yes';
+  return;
+ }
+ if(e.target.name==='postedExternally')return;
+ var approval=form.querySelector('[name="reviewed"]');
+ if(approval&&approval.checked){
+  approval.checked=false;
+  var note=q('#approval-persisted');
+  if(note)note.textContent='Post changed. Re-check the review box after checking the updated content.';
+ }
+ form.dataset.reviewedConfirmed='';
+});
 q('#body').addEventListener('submit',async function(e){
  e.preventDefault();
  var form=e.target,f=new FormData(form);
@@ -666,10 +707,14 @@ q('#body').addEventListener('submit',async function(e){
    if(!p.title||!p.caption){useCaptionTab('Facebook');return formProblem('#postformerror','Add a title and Facebook caption.')}
    if(p.mediaRefs.length&&p.format==='Text')p.format=p.mediaRefs.length>1?'Carousel':'Image';
    if(!POST_STATUSES.includes(p.status)||!TOPICS.includes(p.topic)||!FORMATS.includes(p.format)||p.networks.some(function(n){return !CHANNELS.includes(n)}))return formProblem('#postformerror','Choose valid publishing settings.');
+   var changedFromApproved=oldPost&&oldPost.reviewed===true&&approvalFields(oldPost)!==approvalFields(p);
+   if(changedFromApproved&&f.has('reviewed')&&form.dataset.reviewedConfirmed!=='yes')
+    return formProblem('#postformerror','This post changed since it was last approved. Untick then tick the review confirmation again before saving it as approved.');
    var errors=releaseChecks(p,f.has('reviewed'),f.has('postedExternally'));
    if(errors.length)return formProblem('#postformerror',errors.join(' '));
    data.posts=data.posts.filter(function(z){return z.id!==p.id});data.posts.push(p);
-   if(await save()){editing=null;navigate('posts')}
+   if(await save({skipRender:true})){editing=null;navigate('posts');info(p.reviewed?'Review saved successfully; post is '+p.status:'Post saved as '+p.status)}
+   else formProblem('#postformerror','Saving failed in this browser. Keep this tab open; check device storage and try again. Your previous encrypted copy has not been replaced.');
   }catch(err){formProblem('#postformerror','Could not save this post: '+err.message)}
  }else if(form.id==='contactform'){
   var c={id:contactEditing||id(),name:String(f.get('name')),category:String(f.get('category')),status:String(f.get('status')),notes:String(f.get('notes'))};
