@@ -8,6 +8,55 @@
 #app{display:grid;grid-template-columns:225px minmax(0,1fr);min-height:100dvh}aside{background:#132137;color:white;padding:24px 14px}aside p{font-size:12px;color:#a3b8c9}aside button{display:block;width:100%;background:none;border:0;color:#b7cbda;text-align:left;padding:12px;border-radius:8px;font-weight:700}aside button:hover,aside button.active{background:#30465d;color:white}.connections-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px}.connections-grid .panel{margin:0}.connection-header{display:flex;align-items:start;justify-content:space-between;gap:8px}.setup-check{display:flex;align-items:flex-start;gap:8px;margin:10px 0;font-size:13px}.setup-check input{margin-top:4px;min-width:17px;min-height:17px}.connection-link{display:inline-block;margin-top:8px}.status-pending{display:inline-block;background:#fff2d8;color:#704600;border:1px solid #b99139;border-radius:8px;padding:3px 7px;font-size:11px;font-weight:700}.connections-guide{margin:0;padding-left:20px}.connections-guide li{margin:8px 0}.status-note{background:#eff5fb;border:1px solid #b7cddd;border-radius:10px;padding:12px;font-size:13px;margin:12px 0}.form-hint{color:#526778;font-weight:400;font-size:12px}.post-tools{display:flex;flex-wrap:wrap;align-items:end;gap:12px}.post-tools label{min-width:160px;flex:1}.post-tools input,.post-tools select{width:100%;border:1px solid #cad5df;border-radius:8px;padding:9px}.post-metrics{display:flex;gap:9px;flex-wrap:wrap;margin:7px 0;color:#566c7c;font-size:12px}.post-metrics span{border-radius:6px;background:#eef3f5;padding:3px 6px}fieldset.channels{border:1px solid #d1dde4;border-radius:10px;padding:12px;margin-top:12px}fieldset.channels legend{font-weight:650;padding:0 5px}.channel-options{display:flex;gap:12px;flex-wrap:wrap}.channel-options label{display:flex;align-items:center;gap:6px}.channel-options input{width:auto;min-width:16px;min-height:16px}.form-error{color:#973041;background:#fff0f1;padding:10px;border-radius:8px;min-height:30px}.calendar-event{display:block;width:100%;border:0;background:#e5f2ef;border-radius:4px;font-size:10px;padding:3px;margin:3px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left}.calendar-event:hover,.calendar-event:focus-visible{background:#b7dcd2}.stats.four{grid-template-columns:repeat(4,minmax(0,1fr))}.danger-text{color:#8b2c3b}
 header{display:flex;align-items:center;justify-content:space-between;gap:12px;background:white;padding:22px 26px;border-bottom:1px solid #e1e8ee}main{min-width:0}.body{padding:22px;max-width:1100px;margin:0 auto}.panel{border:1px solid #e1e6ec;background:white;border-radius:15px;padding:20px;margin:0 0 15px;box-shadow:0 5px 25px #13243908}.hero{background:linear-gradient(120deg,#193046,#286e69);color:white}.hero p{color:#dbecea}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stats strong{font-size:28px;display:block;color:#246e67}.tag{background:#e4f1ed;padding:4px 8px;border-radius:20px;font-size:11px;color:#22695f;font-weight:750}.row{border-top:1px solid #e4e9ee;padding:12px 0}.row p{white-space:pre-wrap;overflow-wrap:anywhere}.twocol{display:grid;grid-template-columns:1fr 1fr;gap:10px}.full{grid-column:1/-1}.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.day{border:1px solid #e0e6ea;border-radius:7px;background:white;min-height:76px;padding:5px;overflow:hidden;font-size:11px}.event{font-size:10px;background:#e5f2ef;margin:3px 0;padding:3px;border-radius:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.warn{background:#fff6e6;border:1px solid #e5cfa0;border-radius:10px;padding:13px;font-size:13px}.link{color:#216b66}#status{position:fixed;bottom:15px;right:15px;background:#1c3245;color:white;border-radius:10px;padding:10px 14px;z-index:40}
 @media(max-width:700px){#app{display:block;padding-bottom:65px}aside{position:fixed;bottom:0;left:0;right:0;display:flex;padding:7px;z-index:10;justify-content:space-around}aside .brand,aside p{display:none}aside nav{display:flex;width:100%;overflow-x:auto;scrollbar-width:thin}aside button{flex:0 0 auto;min-width:76px;text-align:center;font-size:11px;padding:9px 3px}header{padding:15px}.body{padding:13px}.stats{grid-template-columns:repeat(3,minmax(0,1fr))}.panel{padding:14px}.twocol{grid-template-columns:1fr}.full{grid-column:auto}.cal{gap:2px}.day{min-height:65px;padding:3px}.event{font-size:9px}.stats.four{grid-template-columns:repeat(2,minmax(0,1fr))}.post-tools{display:block}.post-tools label{display:block;margin:10px 0}}
+
+/* L-I-F-E HQ: design system and responsive navigation */
+:root{--hq-accent:#6354bb;--hq-scale:1;--hq-rainbow:linear-gradient(100deg,#f054a2,#ffbc42,#42cb92,#27c4db,#6560db,#b858b7)}
+body{font-size:calc(15px * var(--hq-scale));background:#f6f7fb}
+body[data-hq-font="rounded"]{font-family:ui-rounded,"Arial Rounded MT Bold",system-ui,sans-serif}
+body[data-hq-font="serif"]{font-family:Georgia,serif}
+body[data-hq-font="system"]{font-family:system-ui,-apple-system,sans-serif}
+#app aside{background:#111725;border-right:1px solid #2e3951}
+#app aside .brand{padding:8px 10px 18px;border-bottom:1px solid #3c4559;margin-bottom:12px}
+#app aside button{border-radius:11px;margin:3px 0;transition:background .2s}
+#app aside button.active{background:linear-gradient(100deg,#553b66,#205c60);color:white;box-shadow:inset 3px 0 #f78cbd}
+#app header{position:sticky;top:0;z-index:8;box-shadow:0 3px 14px #1115280a}
+#app h2{font-weight:800;letter-spacing:-.03em}
+#app .hero{background:linear-gradient(110deg,#1a1c36,#24455b 72%,#513e66)}
+.panel{box-shadow:0 7px 25px #11152c0a}
+.btn:hover{filter:brightness(.96)}
+.btn.primary{background:var(--hq-accent);border-color:var(--hq-accent);color:#fff}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.tag{background:#ecebfa;color:#3f357d}
+.toolbar-row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.brand-rainbow{height:5px;background:var(--hq-rainbow);border-radius:8px;margin:12px 0 20px}
+.tool-tabs,.composer-tabs{display:flex;gap:7px;overflow-x:auto;padding:4px 0 12px;scroll-snap-type:x mandatory}
+.tool-tabs button,.composer-tabs button{flex:0 0 auto;scroll-snap-align:start;border-radius:99px;border:1px solid #d2d6e3;padding:8px 14px;background:white;color:#38435c;font-weight:750}
+.tool-tabs button[aria-selected="true"],.composer-tabs button.active{background:#1c2440;color:#fff;border-color:#1c2440}
+.tile-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.media-tile{border:1px solid #dbe2ea;border-radius:13px;padding:11px;background:#fff;min-width:0}
+.media-tile img{display:block;width:100%;aspect-ratio:1;object-fit:contain;border-radius:9px;background:#08080b}
+.media-tile small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.media-tile .actions{margin-top:8px}
+.media-tile button{font-size:12px;min-height:33px}
+.upload-zone{border:2px dashed #aebcd2;padding:23px;border-radius:15px;text-align:center;background:#fafbff}
+.upload-zone.dragover{background:#e9e9fa;border-color:var(--hq-accent)}
+.emoji-toolbar{display:flex;gap:6px;flex-wrap:wrap;padding:10px;border-radius:10px;background:#f7f7fc;border:1px dashed #cad1e1}
+.emoji-toolbar button{border:1px solid #ecebf3;border-radius:8px;background:#fff;min-width:39px;min-height:39px;font-size:20px}
+.compose-media-preview{display:flex;gap:8px;flex-wrap:wrap;padding:10px 0}
+.compose-media-preview figure{margin:0;width:110px}
+.compose-media-preview img{width:110px;height:110px;object-fit:contain;background:#0a0b13;border-radius:8px}
+.compose-media-preview button{width:110px;border-radius:8px;font-size:12px}
+.bin-item{display:flex;gap:12px;align-items:center;justify-content:space-between;border-bottom:1px solid #e5e8f1;padding:13px 0}
+.bin-item:last-child{border-bottom:0}
+.brand-settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:13px}
+.theme-preview{padding:22px;border-radius:13px;background:#07080c;color:white;text-align:center}
+.theme-preview h3{font-size:27px}
+.range-row{display:flex;align-items:center;gap:10px}.range-row input{flex:1}
+.hq-sidebar-toggle{display:none}
+@media(min-width:901px){.hq-sidebar-toggle{display:inline-flex}#app.nav-collapsed{grid-template-columns:76px minmax(0,1fr)}#app.nav-collapsed aside{padding:16px 8px}#app.nav-collapsed aside .brand .logo{font-size:12px;letter-spacing:0}#app.nav-collapsed aside .brand p{display:none}#app.nav-collapsed aside button{font-size:0;text-align:center;padding:12px 2px}#app.nav-collapsed aside button::first-letter{font-size:18px}}
+@media(max-width:900px){#app aside{overflow-x:auto}#app aside button{white-space:nowrap}#app aside nav{display:flex;overflow-x:auto;scroll-snap-type:x proximity}}
+@media(max-width:700px){#app aside nav button{scroll-snap-align:center}#app header{padding:10px 12px}#app header .btn{font-size:12px;padding:7px 8px;min-height:36px}.bin-item{display:block}.bin-item .actions{margin-top:9px}}
+
 </style></head><body>
 <section id="signin" class="auth"><div class="authbox"><div class="logo">L-I-F-E</div><h1>Social Media HQ</h1><p class="muted">Private planning workspace for the 30 January 2027 launch in Milton Keynes.</p><form id="authform"><label class="field">Workspace email label (not Google sign-in)<input id="email" type="email" value="alyssa-may.grogan@lifeinfullecosystem.org" autocomplete="username" required></label><label class="field">Device workspace password<input id="password" type="password" minlength="12" autocomplete="current-password" required></label><label class="setup-check"><input id="trustdevice" type="checkbox"> Keep me signed in on this trusted device for 30 days</label><button id="unlock" class="btn primary">Log in</button><p id="autherror" class="error" role="alert"></p></form><button id="quickunlock" class="btn hidden" type="button">Continue on this device</button><button id="forgetdevice" class="btn danger hidden" type="button">Forget this device</button><p class="muted">First login on this browser: choose a private workspace password (12+ characters). Your browser password manager may save it. Trusted-device access is optional; anyone using this browser profile could open your local drafts.</p><div class="warn"><strong>Temporary device-only mode.</strong> This is an encrypted local workspace, not Google account verification or cross-device synchronization. No social networks are connected.</div><p class="muted"><a class="link" href="/">← Return to L-I-F-E website</a></p></div></section>
 <div id="app" class="hidden"><aside><div class="brand"><div class="logo">L-I-F-E</div><p>SOCIAL MEDIA HQ</p></div><nav id="nav"><button data-page="home">⌂ Overview</button><button data-page="posts">✎ Posts</button><button data-page="media">▧ Media</button><button data-page="trash">♻ Recycle Bin</button><button data-page="calendar">▦ Calendar</button><button data-page="brand">✦ Brand Studio</button><button data-page="campaigns">Campaigns</button><button data-page="reports">Reports</button><button data-page="contacts">Outreach</button><button data-page="connections">Accounts</button><button data-page="settings">Backup</button></nav></aside><main><header><div><small class="muted">L-I-F-E • Internal campaign</small><h2 id="heading">Overview</h2></div><div class="toolbar-row"><button class="btn hq-sidebar-toggle" id="toggle-sidebar" type="button" aria-label="Collapse or expand navigation" aria-expanded="true">☰</button><button class="btn" id="lock" type="button">Lock</button><button class="btn danger" id="logout" type="button">Log out</button></div></header><div id="body" class="body"></div></main></div><div id="status" class="hidden" role="status"></div>
@@ -500,6 +549,73 @@ async function importWeekPackage(fileList){
 }
 
 q('#body').addEventListener('change',async function(e){if(e.target.id!=='backupfile'||!e.target.files.length)return;try{var file=e.target.files[0];if(file.size>6000000)throw Error('Backup too large');var r=JSON.parse(await file.text());if(pendingSaves)throw Error('Wait until the current save finishes');if(!confirm('Replace all local workspace data with this backup?'))return;var p=prompt('Enter the password used for this backup');if(!p)return;var output=await decrypt(p,r);localStorage.setItem(STORAGE,JSON.stringify(r));session++;key=output.key;saved=r;data=output.data;lastSaveFailed=false;render();info('Backup restored')}catch(err){info('Backup could not be restored')}})
+
+/* Remembered access is optional, same-origin and same-device only:
+   the AES CryptoKey is nonextractable; no password is stored in cleartext. */
+async function trustedDb(){
+ return new Promise(function(resolve,reject){var request=indexedDB.open('life-hq-trusted-auth-v1',1);
+ request.onupgradeneeded=function(){if(!request.result.objectStoreNames.contains('auth'))request.result.createObjectStore('auth',{keyPath:'id'})};
+ request.onsuccess=function(){resolve(request.result)};request.onerror=function(){reject(request.error||Error('Storage unavailable'))}});
+}
+async function trustedRecord(operation,value){
+ var db=await trustedDb();
+ try{return await new Promise(function(resolve,reject){
+  var tr=db.transaction('auth',operation==='get'?'readonly':'readwrite'),store=tr.objectStore('auth');
+  var req=operation==='get'?store.get('trusted'):operation==='delete'?store.delete('trusted'):store.put(value);
+  req.onsuccess=function(){resolve(req.result)};req.onerror=function(){reject(req.error||Error('Device access failed'))}
+ })}finally{db.close()}
+}
+async function trustThisDevice(){
+ if(!key||!saved)throw Error('Workspace must be unlocked first');
+ await trustedRecord('put',{id:'trusted',cryptoKey:key,salt:saved.salt,expires:Date.now()+30*86400000});
+ q('#trustdevice').checked=true;
+}
+async function forgetThisDevice(){
+ await trustedRecord('delete');
+ q('#quickunlock').classList.add('hidden');q('#forgetdevice').classList.add('hidden');
+}
+async function checkTrustedDevice(){
+ var record;try{record=await trustedRecord('get')}catch(err){return null}
+ if(!record||record.expires<Date.now()||!record.cryptoKey){if(record)await forgetThisDevice();return null}
+ q('#quickunlock').classList.remove('hidden');q('#forgetdevice').classList.remove('hidden');return record;
+}
+async function rememberedLogin(record){
+ var raw=localStorage.getItem(STORAGE);if(!raw)throw Error('Workspace not found on this device');
+ saved=JSON.parse(raw);
+ if(!record||record.salt!==saved.salt)throw Error('Remembered key is for a different workspace');
+ var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:un64(saved.iv)},record.cryptoKey,un64(saved.payload));
+ return {key:record.cryptoKey,data:validateWorkspace(JSON.parse(dec.decode(plain)))};
+}
+q('#quickunlock').addEventListener('click',async function(){
+ this.disabled=true;
+ try{var record=await checkTrustedDevice();await finishLogin(await rememberedLogin(record),false)}
+ catch(err){q('#autherror').textContent='Quick access expired. Log in using your workspace password.';await forgetThisDevice()}
+ finally{q('#quickunlock').disabled=false}
+});
+q('#forgetdevice').addEventListener('click',async function(){await forgetThisDevice();info('This device will now need the workspace password')});
+q('#logout').addEventListener('click',async function(){
+ if(pendingSaves){info('Finish saving first');return}
+ await forgetThisDevice();lock();info('Logged out; trusted-device access removed');
+});
+q('#toggle-sidebar').addEventListener('click',function(){
+ var collapsed=q('#app').classList.toggle('nav-collapsed');
+ this.setAttribute('aria-expanded',String(!collapsed));this.textContent=collapsed?'☷':'☰';
+});
+['pointerdown','keydown'].forEach(function(type){window.addEventListener(type,function(){lastActivity=Date.now()},{passive:true})});
+setInterval(function(){if(data&&Date.now()-lastActivity>45*60*1000){lock();info('Workspace locked after 45 minutes of inactivity')}},60000);
+checkTrustedDevice().then(async function(record){
+ if(!record||sessionStorage.getItem('life-hq-manual-lock'))return;
+ try{await finishLogin(await rememberedLogin(record),false)}
+ catch(err){await forgetThisDevice();q('#autherror').textContent='Trusted access expired. Log in with your password.'}
+}).catch(function(){});
+function applyBrand(){
+ var b=data&&data.brand||{},fonts=['system','rounded','serif'];
+ var choice=fonts.includes(b.font)?b.font:'system';
+ document.body.dataset.hqFont=choice;
+ document.documentElement.style.setProperty('--hq-scale',String(Math.max(0.85,Math.min(1.3,Number(b.uiScale)||1))));
+ document.documentElement.style.setProperty('--hq-accent',/^#[0-9a-fA-F]{6}$/.test(b.accent||'')?b.accent:'#6354bb');
+}
+
 window.addEventListener('beforeunload',function(e){if(pendingSaves||lastSaveFailed){e.preventDefault();e.returnValue='';}});
 })();
 </script></body></html>
