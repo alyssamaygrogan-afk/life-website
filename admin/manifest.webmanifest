@@ -1,0 +1,31 @@
+{
+  "id": "/admin/",
+  "name": "L-I-F-E Social Media HQ",
+  "short_name": "L-I-F-E HQ",
+  "description": "Private planning and design workspace for L-I-F-E — Living IN FULL Ecosystem.",
+  "lang": "en-GB",
+  "dir": "ltr",
+  "start_url": "/admin/?installed=1",
+  "scope": "/admin/",
+  "display": "standalone",
+  "background_color": "#080b16",
+  "theme_color": "#111725",
+  "categories": [
+    "productivity",
+    "business"
+  ],
+  "icons": [
+    {
+      "src": "/admin/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/admin/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
