@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="L-I-F-E Social Media HQ">
+<defs><linearGradient id="flow" x1="5%" y1="30%" x2="95%" y2="70%">
+<stop offset="0%" stop-color="#fc438e"/><stop offset="20%" stop-color="#ffb949"/>
+<stop offset="38%" stop-color="#f5e456"/><stop offset="54%" stop-color="#43dc91"/>
+<stop offset="72%" stop-color="#23c4ed"/><stop offset="85%" stop-color="#745cec"/><stop offset="100%" stop-color="#f15cb4"/>
+</linearGradient></defs>
+<rect width="512" height="512" rx="108" fill="#080b16"/>
+<path d="M94 240 C103 157 194 151 255 237 C332 354 426 317 420 239 C416 158 325 154 255 237 C188 325 94 324 94 240" fill="none" stroke="url(#flow)" stroke-width="37" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M94 240 C103 157 194 151 255 237 C332 354 426 317 420 239 C416 158 325 154 255 237 C188 325 94 324 94 240" fill="none" stroke="#ffffff" stroke-opacity=".16" stroke-width="7" stroke-linecap="round"/>
+<text x="256" y="410" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-weight="800" font-size="75" fill="#ffffff">L-I-F-E</text>
+<rect x="110" y="444" width="292" height="8" rx="4" fill="url(#flow)"/>
+</svg>
