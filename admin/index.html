@@ -859,12 +859,14 @@ async function recoveryRecord(operation,value){
  var db=await recoveryDb();
  try{
   return await new Promise(function(resolve,reject){
-   var tx=db.transaction('snapshots',operation==='get'?'readonly':'readwrite');
+   var result,settled=false,tx=db.transaction('snapshots',operation==='get'?'readonly':'readwrite');
    var store=tx.objectStore('snapshots');
    var req=operation==='get'?store.get('before-week-import'):operation==='delete'?store.delete('before-week-import'):store.put(value);
-   req.onsuccess=function(){resolve(req.result)};
-   req.onerror=function(){reject(req.error||Error('Recovery storage failed'))};
-   tx.onabort=function(){reject(tx.error||Error('Insufficient device storage for a recovery copy'))};
+   req.onsuccess=function(){result=req.result};
+   function fail(err){if(settled)return;settled=true;reject(err)}
+   tx.oncomplete=function(){if(settled)return;settled=true;resolve(result)};
+   tx.onerror=function(){fail(tx.error||Error('Recovery storage failed'))};
+   tx.onabort=function(){fail(tx.error||Error('Insufficient device storage for recovery copy'))};
   });
  }finally{db.close()}
 }
