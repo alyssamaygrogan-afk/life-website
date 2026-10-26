@@ -440,7 +440,15 @@ async function prepareWeeklyDrafts(automatic){
   }else if(date>'2026-12-03'&&date<'2027-01-30'){
    caption+=' If the venue and ticket options have been approved, add only the confirmed details and booking link.';
   }
-  data.posts.push({id:id(),title:title,date:date,time:'12:00',status:'Draft',caption:caption,weeklyKey:weeklyKey});
+  var newDraft={id:id(),title:title,date:date,time:'12:00',status:'Draft',caption:caption,weeklyKey:weeklyKey};
+  var card=typeof lifeSevenImageCopy!=='undefined'&&lifeSevenImageCopy.find(function(row){return row[0]===date});
+  if(card){
+   var day=Number(date.slice(-2)),days=day>=26?122-day:91-day;
+   newDraft.title=card[2];newDraft.caption=card[3]+'\n\n'+card[4]+'\n\n'+card[5]+'\n\n#LIFE2027 #LivingINFull';
+   newDraft.platformCaptions={Facebook:newDraft.caption,Instagram:card[3]+'\n\n'+card[4]+'\n\n'+days+' days to go! 🌈 #LIFE2027',TikTok:card[3]+' '+card[4]+' '+days+' days to go! 🌈 #LIFE2027',LinkedIn:card[4]+' '+card[5]+' #LIFE2027'};
+   newDraft.altText=card[6];newDraft.networks=['Facebook','Instagram','TikTok','LinkedIn'];newDraft.reviewed=false;
+  }
+  data.posts.push(newDraft);
   count++;
  }
  if(automatic)data.weeklyLastAuto=monday;
