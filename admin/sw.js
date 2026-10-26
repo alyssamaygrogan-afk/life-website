@@ -1,8 +1,8 @@
 /* L-I-F-E Social Media HQ PWA: cache the PUBLIC app shell only.
    Never cache encrypted workspace data, uploads, API responses or URLs outside /admin/. */
 'use strict';
-const CACHE_NAME='life-hq-static-v1';
-const SHELL=['/admin/','/admin/manifest.webmanifest','/admin/app-icon.svg'];
+const CACHE_NAME='life-hq-static-v2';
+const SHELL=['/admin/','/admin/manifest.webmanifest','/admin/app-icon.svg','/admin/apple-touch-icon.png'];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
 });
@@ -17,7 +17,7 @@ self.addEventListener('fetch',event=>{
  if(req.method!=='GET'||new URL(req.url).origin!==self.location.origin)return;
  const url=new URL(req.url);
  if(!url.pathname.startsWith('/admin/'))return;
- const eligible=url.pathname==='/admin/'||url.pathname==='/admin/index.html'||url.pathname==='/admin/manifest.webmanifest'||url.pathname==='/admin/app-icon.svg';
+ const eligible=url.pathname==='/admin/'||url.pathname==='/admin/index.html'||url.pathname==='/admin/manifest.webmanifest'||url.pathname==='/admin/app-icon.svg'||url.pathname==='/admin/apple-touch-icon.png';
  if(!eligible)return;
  event.respondWith(
   fetch(req).then(response=>{
