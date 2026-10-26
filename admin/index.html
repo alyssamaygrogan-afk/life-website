@@ -23,7 +23,7 @@ body[data-hq-font="system"]{font-family:system-ui,-apple-system,sans-serif}
 #app h2{font-weight:800;letter-spacing:-.03em}
 #app .hero{background:linear-gradient(110deg,#1a1c36,#24455b 72%,#513e66)}
 .panel{box-shadow:0 7px 25px #11152c0a}
-.btn:hover{filter:brightness(.96)}
+.btn:hover{filter:brightness(.96)}[hidden]{display:none!important}
 .btn.primary{background:var(--hq-accent);border-color:var(--hq-accent);color:#fff}
 .btn:disabled{opacity:.55;cursor:not-allowed}
 .tag{background:#ecebfa;color:#3f357d}
@@ -183,6 +183,7 @@ q('#authform').addEventListener('submit',async function(e){
   if(raw){saved=JSON.parse(raw);result=await decrypt(p,saved)}
   else{saved={v:1,salt:b64(crypto.getRandomValues(new Uint8Array(16)))};key=await derive(p,un64(saved.salt));data={posts:[],contacts:[],created:new Date().toISOString()};await encrypt();result={key:key,data:data}}
   await finishLogin(result,q('#trustdevice').checked);
+  if(!q('#trustdevice').checked)await forgetThisDevice();
  }catch(err){key=null;data=null;q('#autherror').textContent='Unable to log in. Check your password or restore an encrypted backup.'}
  finally{q('#unlock').disabled=false}
 });
@@ -449,7 +450,8 @@ q('#body').addEventListener('submit',async function(e){
     interactions:metricNumber(f.get('interactions'),1000000000),
     reviewed:f.has('reviewed'),reviewedAt:f.has('reviewed')?new Date().toISOString():''
    });
-   if(!p.title||!p.caption)return formProblem('#postformerror','Add a title and caption.');
+   if(!p.title||!p.caption){useCaptionTab('Facebook');return formProblem('#postformerror','Add a title and Facebook caption.')}
+   if(p.mediaRefs.length&&p.format==='Text')p.format=p.mediaRefs.length>1?'Carousel':'Image';
    if(!POST_STATUSES.includes(p.status)||!TOPICS.includes(p.topic)||!FORMATS.includes(p.format)||p.networks.some(function(n){return !CHANNELS.includes(n)}))return formProblem('#postformerror','Choose valid publishing settings.');
    var errors=releaseChecks(p,f.has('reviewed'),f.has('postedExternally'));
    if(errors.length)return formProblem('#postformerror',errors.join(' '));
@@ -595,7 +597,7 @@ async function importWeekPackage(fileList){
  }catch(err){data.posts=previous;data.media=prevMedia;throw err}
 }
 
-q('#body').addEventListener('change',async function(e){if(e.target.id!=='backupfile'||!e.target.files.length)return;try{var file=e.target.files[0];if(file.size>6000000)throw Error('Backup too large');var r=JSON.parse(await file.text());if(pendingSaves)throw Error('Wait until the current save finishes');if(!confirm('Replace all local workspace data with this backup?'))return;var p=prompt('Enter the password used for this backup');if(!p)return;var output=await decrypt(p,r);localStorage.setItem(STORAGE,JSON.stringify(r));session++;key=output.key;saved=r;data=output.data;lastSaveFailed=false;render();info('Backup restored')}catch(err){info('Backup could not be restored')}})
+q('#body').addEventListener('change',async function(e){if(e.target.id!=='backupfile'||!e.target.files.length)return;try{var file=e.target.files[0];if(file.size>6000000)throw Error('Backup too large');var r=JSON.parse(await file.text());if(pendingSaves)throw Error('Wait until the current save finishes');if(!confirm('Replace all local workspace data with this backup?'))return;var p=prompt('Enter the password used for this backup');if(!p)return;var output=await decrypt(p,r);localStorage.setItem(STORAGE,JSON.stringify(r));session++;key=output.key;saved=r;data=output.data;data.trash=data.trash||[];data.media=data.media||[];data.brand=data.brand||{};lastSaveFailed=false;await forgetThisDevice();applyBrand();render();info('Posts-only backup restored. Images require a complete backup.')}catch(err){info('Backup could not be restored')}})
 
 
 
@@ -632,7 +634,7 @@ async function addMediaFiles(files,attach){
   if(attach)draftMediaRefs.push('localmedia:'+mediaId);
   count++;
  }
- if(attach)refreshMediaComposer();
+ if(attach){var composer=q('#postform');if(composer&&composer.elements.format&&composer.elements.format.value==='Text')composer.elements.format.value=draftMediaRefs.length>1?'Carousel':'Image';refreshMediaComposer()}
  // Only the media metadata is in workspace JSON; binary images stay encrypted in IndexedDB.
  if(!await save(attach?{skipRender:true}:undefined))throw Error('Image metadata could not be saved on this device');
  info(count+' image'+(count===1?'':'s')+' saved');
@@ -689,7 +691,7 @@ q('#body').addEventListener('click',async function(e){
  try{
   if(b.dataset.action==='makebrandcard'){await makeBrandCard();return}
   if(b.dataset.detachMedia){draftMediaRefs=draftMediaRefs.filter(function(x){return x!==b.dataset.detachMedia});refreshMediaComposer();return}
-  if(b.dataset.attachMedia){if(draftMediaRefs.length>=8)throw Error('Maximum 8 images in one post');var ref='localmedia:'+b.dataset.attachMedia;if(!draftMediaRefs.includes(ref))draftMediaRefs.push(ref);refreshMediaComposer();return}
+  if(b.dataset.attachMedia){if(draftMediaRefs.length>=8)throw Error('Maximum 8 images in one post');var ref='localmedia:'+b.dataset.attachMedia;if(!draftMediaRefs.includes(ref))draftMediaRefs.push(ref);var f=q('#postform');if(f&&f.elements.format&&f.elements.format.value==='Text')f.elements.format.value=draftMediaRefs.length>1?'Carousel':'Image';refreshMediaComposer();return}
   if(b.dataset.useMedia){editing=null;navigate('post');draftMediaRefs=['localmedia:'+b.dataset.useMedia];refreshMediaComposer();return}
   if(b.dataset.exportMedia){await exportMedia(b.dataset.exportMedia);return}
   if(b.dataset.trashMedia){if(!await confirmHQ('Move this image to the recycle bin? Existing posts can continue to use it.','Move to bin'))return;moveToTrash('media',b.dataset.trashMedia);if(await save())navigate('media');return}
