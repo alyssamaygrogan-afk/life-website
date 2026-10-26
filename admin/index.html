@@ -223,7 +223,7 @@ function postForm(){
  +'<label class="field">Campaign topic<select name="topic">'+TOPICS.map(function(v){return '<option '+(v===(x.topic||'General')?'selected':'')+'>'+esc(v)+'</option>'}).join('')+'</select></label><label class="field">Content format<select name="format">'+FORMATS.map(function(v){return '<option '+(v===(x.format||'Text')?'selected':'')+'>'+v+'</option>'}).join('')+'</select></label>'
  +'<fieldset class="channels full"><legend>Intended social platforms — not connected</legend><div class="channel-options">'+CHANNELS.map(function(v){return '<label><input type="checkbox" name="networks" value="'+v+'" '+(networks.includes(v)?'checked':'')+'>'+v+'</label>'}).join('')+'</div></fieldset>'
  +'<label class="field full">Caption<textarea name="caption" maxlength="10000" required>'+esc(x.caption)+'</textarea></label>'
- +'<label class="field full">Image or video file note <span class="form-hint">(reference only; no uploading yet)</span><input name="assetRef" maxlength="500" placeholder="e.g. Google Drive folder / launch-graphic.png" value="'+esc(x.assetRef||'')+'"></label>'
+ +mediaComposer()+'<label class="field full">External image/video reference (optional)<input name="assetRef" maxlength="500" placeholder="Optional reference to externally stored content" value="'+esc(x.assetRef&&x.assetRef.startsWith('localmedia:')?'':x.assetRef||'')+'"></label>'
  +(x.assetRef&&x.assetRef.startsWith('localmedia:')?'<div class="full"><p>Attached L-I-F-E artwork stored privately on this device:</p><img data-hq-media="'+esc(x.assetRef.slice(11))+'" alt="'+esc(x.altText||'Image preview')+'" style="width:220px;max-width:100%;aspect-ratio:1;object-fit:contain;border-radius:10px;background:#000"></div>':'')+'<label class="field full">Accessible image description (alt text)<textarea name="altText" maxlength="2000" placeholder="Describe the image for screen reader users">'+esc(x.altText||'')+'</textarea></label>'+['Instagram','TikTok','LinkedIn'].map(function(n){return '<label class="field full">'+n+' caption adaptation<textarea name="platform_'+n+'" maxlength="10000">'+esc((x.platformCaptions||{})[n]||'')+'</textarea></label>'}).join('')
  +'<label class="field full">Call-to-action link <span class="form-hint">(https only; check the destination)</span><input name="ctaUrl" type="url" maxlength="2000" placeholder="https://lifeinfullecosystem.org/" value="'+esc(x.ctaUrl||'')+'"></label>'
  +'<label class="field full">External published post link <span class="form-hint">(only after posting manually)</span><input name="publishedUrl" type="url" maxlength="2000" value="'+esc(x.publishedUrl||'')+'"></label>'
@@ -413,10 +413,10 @@ q('#body').addEventListener('submit',async function(e){
    var oldPost=data.posts.find(function(z){return z.id===editing});
    var p=Object.assign({},oldPost||{},{
     platformCaptions:{Facebook:String(f.get('caption')).trim(),Instagram:String(f.get('platform_Instagram')||'').trim(),TikTok:String(f.get('platform_TikTok')||'').trim(),LinkedIn:String(f.get('platform_LinkedIn')||'').trim()},
-    id:editing||id(),title:String(f.get('title')).trim(),date:String(f.get('date')),time:String(f.get('time')),
+    mediaRefs:draftMediaRefs.slice(),id:editing||id(),title:String(f.get('title')).trim(),date:String(f.get('date')),time:String(f.get('time')),
     status:String(f.get('status')),caption:String(f.get('caption')).trim(),topic:String(f.get('topic')),
     format:String(f.get('format')),networks:f.getAll('networks').map(String),
-    assetRef:String(f.get('assetRef')).trim(),altText:String(f.get('altText')).trim(),
+    assetRef:draftMediaRefs[0]||String(f.get('assetRef')).trim(),altText:String(f.get('altText')).trim(),
     ctaUrl:String(f.get('ctaUrl')).trim(),publishedUrl:String(f.get('publishedUrl')).trim(),
     views:metricNumber(f.get('views'),1000000000),clicks:metricNumber(f.get('clicks'),1000000000),
     interactions:metricNumber(f.get('interactions'),1000000000),
@@ -493,25 +493,40 @@ function mediaDb(){
   req.onerror=function(){reject(req.error||Error('Cannot open local artwork storage'))};
  });
 }
+
 async function mediaPut(mediaId,file){
  if(!key)throw Error('Unlock workspace first');
- if(file.type&&file.type!=='image/png')throw Error('Only PNG artwork is accepted');
- if(file.size>6000000)throw Error('Artwork exceeds 6MB: '+file.name);
+ var mime=file.type||'image/png';
+ if(!['image/png','image/jpeg','image/webp'].includes(mime))throw Error('Use a PNG, JPEG or WebP image.');
+ if(file.size>8000000||file.size<10)throw Error('Images must be smaller than 8 MB and not empty.');
+ if(typeof createImageBitmap==='function'){
+  var picture;try{picture=await createImageBitmap(file);if(picture.width>12000||picture.height>12000)throw Error('Image dimensions too large')}
+  finally{if(picture)picture.close()}
+ }
  var raw=await file.arrayBuffer(),iv=crypto.getRandomValues(new Uint8Array(12));
- var crypt=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv},key,raw);
+ var encrypted=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv},key,raw);
  var db=await mediaDb();
  try{await new Promise(function(resolve,reject){
   var tr=db.transaction('media','readwrite');
-  tr.objectStore('media').put({id:mediaId,iv:iv.buffer,encrypted:crypt,mime:'image/png'});
+  tr.objectStore('media').put({id:mediaId,iv:iv.buffer,encrypted:encrypted,mime:mime});
   tr.oncomplete=resolve;tr.onerror=function(){reject(tr.error||Error('Could not store artwork'))};tr.onabort=function(){reject(tr.error||Error('Artwork save aborted'))};
  })}finally{db.close()}
 }
 async function mediaGet(mediaId){
  var db=await mediaDb(),entry;
- try{entry=await new Promise(function(resolve,reject){var tr=db.transaction('media','readonly'),request=tr.objectStore('media').get(mediaId);request.onsuccess=function(){resolve(request.result)};request.onerror=function(){reject(request.error)}})}finally{db.close()}
+ try{entry=await new Promise(function(resolve,reject){var tr=db.transaction('media','readonly'),req=tr.objectStore('media').get(mediaId);req.onsuccess=function(){resolve(req.result)};req.onerror=function(){reject(req.error)}})}finally{db.close()}
  if(!entry||!key)throw Error('Artwork not present on this device');
  var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(entry.iv)},key,entry.encrypted);
- return new Blob([plain],{type:'image/png'});
+ return new Blob([plain],{type:entry.mime||'image/png'});
+}
+async function mediaRemove(mediaId){
+ var ref='localmedia:'+mediaId;
+ if(data&&data.posts.some(function(p){return p.assetRef===ref||(p.mediaRefs||[]).includes(ref)}))return;
+ if(data&&(data.trash||[]).some(function(x){return x.kind==='post'&&x.record&&(x.record.assetRef===ref||(x.record.mediaRefs||[]).includes(ref))}))return;
+ var db=await mediaDb();
+ try{await new Promise(function(resolve,reject){var tr=db.transaction('media','readwrite');
+ tr.objectStore('media').delete(mediaId);tr.oncomplete=resolve;tr.onerror=function(){reject(tr.error)}
+ })}finally{db.close()}
 }
 function showMediaPreviews(){
  mediaUrls.forEach(function(url){URL.revokeObjectURL(url)});mediaUrls=[];
@@ -537,7 +552,12 @@ async function importWeekPackage(fileList){
  var replaced=data.posts.filter(function(p){return p.status==='Draft'&&p.date>='2026-10-26'&&p.date<='2026-11-01'}).length;
  if(!confirm('Download a backup, then replace '+replaced+' existing DRAFT posts dated 26 October–1 November with 7 new drafts and encrypted artwork? Other dates, approved posts, contacts and campaigns stay unchanged.'))return;
  download();
- for(var p of pack.posts){await mediaPut(p.weeklyKey,mediaFiles[p.assetRef])}
+ var prevMedia=data.media.slice();
+ for(var p of pack.posts){
+  await mediaPut(p.weeklyKey,mediaFiles[p.assetRef]);
+  if(!data.media.some(function(x){return x.id===p.weeklyKey}))
+   data.media.push({id:p.weeklyKey,name:p.assetRef,type:mediaFiles[p.assetRef].type||'image/png',size:mediaFiles[p.assetRef].size,altText:p.altText,createdAt:new Date().toISOString(),source:'weekly-import'});
+ }
  var previous=data.posts.slice();
  try{
   data.posts.filter(function(p){return p.status==='Draft'&&p.date>='2026-10-26'&&p.date<='2026-11-01'}).forEach(function(p){moveToTrash('post',p.id)});
@@ -545,11 +565,112 @@ async function importWeekPackage(fileList){
   validateWorkspace(data);
   if(!await save())throw Error('Encrypted workspace save failed');
   navigate('posts');info('Seven L-I-F-E image drafts imported. Nothing published.');
- }catch(err){data.posts=previous;throw err}
+ }catch(err){data.posts=previous;data.media=prevMedia;throw err}
 }
 
 q('#body').addEventListener('change',async function(e){if(e.target.id!=='backupfile'||!e.target.files.length)return;try{var file=e.target.files[0];if(file.size>6000000)throw Error('Backup too large');var r=JSON.parse(await file.text());if(pendingSaves)throw Error('Wait until the current save finishes');if(!confirm('Replace all local workspace data with this backup?'))return;var p=prompt('Enter the password used for this backup');if(!p)return;var output=await decrypt(p,r);localStorage.setItem(STORAGE,JSON.stringify(r));session++;key=output.key;saved=r;data=output.data;lastSaveFailed=false;render();info('Backup restored')}catch(err){info('Backup could not be restored')}})
 
+
+
+function mediaComposer(){
+ var attached=(draftMediaRefs||[]).map(function(ref){return '<figure><img data-hq-media="'+esc(ref.slice(11))+'" alt="Attached image preview"><button class="btn" type="button" data-detach-media="'+esc(ref)+'">Remove</button></figure>'}).join('');
+ var available=(data.media||[]).filter(function(m){return !draftMediaRefs.includes('localmedia:'+m.id)}).slice(-20).reverse().map(function(m){
+  return '<div class="media-tile"><img data-hq-media="'+esc(m.id)+'" alt="'+esc(m.altText||m.name)+'"><small>'+esc(m.name)+'</small><button type="button" class="btn" data-attach-media="'+esc(m.id)+'">Attach</button></div>';
+ }).join('');
+ return '<div class="full panel" style="background:#fafbff;margin:8px 0"><h3>Images and artwork</h3><p class="muted">Upload images directly, reuse existing L-I-F-E artwork and attach up to 8 images to this post. Saved privately, encrypted on this device.</p>'
+ +'<label class="field">Upload PNG, JPEG or WebP images<input id="post-image-upload" type="file" accept="image/png,image/jpeg,image/webp" multiple></label>'
+ +'<div id="composer-attachments" class="compose-media-preview">'+(attached||'<p class="muted">No images attached yet.</p>')+'</div>'
+ +'<details><summary>Choose an image already in your media library</summary><div class="tile-grid" style="margin-top:12px">'+(available||'<p>Your media library is empty. Upload some images first.</p>')+'</div></details>'
+ +'<div class="brand-rainbow"></div><h3>Make a branded square card</h3><label class="field">Card headline<input id="card-headline" maxlength="100" placeholder="e.g. 90 DAYS TO GO!"></label>'
+ +'<button class="btn" type="button" data-action="makebrandcard">Generate branded 1080 × 1080 image</button></div>';
+}
+function mediaLibrary(){
+ var items=(data.media||[]).slice().sort(function(a,b){return (b.createdAt||'').localeCompare(a.createdAt||'')});
+ return '<div class="panel hero"><h3>Media library</h3><p>Upload, preview and reuse your own L-I-F-E images. Stored privately and encrypted on this device. File sizes up to 8 MB each.</p><strong>'+items.length+' assets</strong></div>'
+ +'<div class="panel upload-zone" id="media-drop"><h3>▧ Add your images</h3><p>Choose PNG, JPEG or WebP files, or drag and drop them here.</p><label class="btn primary">Upload images<input id="library-image-upload" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden></label></div>'
+ +'<div class="panel"><h3>My images</h3><div class="tile-grid">'+(items.length?items.map(function(m){
+  return '<div class="media-tile"><img data-hq-media="'+esc(m.id)+'" alt="'+esc(m.altText||m.name)+'"><small title="'+esc(m.name)+'">'+esc(m.name)+'</small><small>'+Math.max(1,Math.round((m.size||0)/1024))+' KB</small><div class="actions"><button class="btn" data-use-media="'+esc(m.id)+'">New post</button><button class="btn" data-export-media="'+esc(m.id)+'">Save copy</button><button class="btn danger" data-trash-media="'+esc(m.id)+'">Bin</button></div></div>';
+ }).join(''):'<p>No uploaded images yet. Add some above, or import the weekly image package from Posts.</p>')+'</div></div>';
+}
+async function addMediaFiles(files,attach){
+ var list=Array.from(files||[]);
+ if(!list.length)return;
+ if(list.length>20)throw Error('Upload 20 images at a time or fewer');
+ if(attach&&draftMediaRefs.length+list.length>8)throw Error('A post supports up to 8 images');
+ var count=0;
+ for(var file of list){
+  var mediaId='upload-'+id();
+  await mediaPut(mediaId,file);
+  data.media.push({id:mediaId,name:String(file.name||'Image').slice(0,250),type:file.type||'image/png',size:file.size,altText:'',createdAt:new Date().toISOString(),source:'upload'});
+  if(attach)draftMediaRefs.push('localmedia:'+mediaId);
+  count++;
+ }
+ if(attach)refreshMediaComposer();
+ // Only the media metadata is in workspace JSON; binary images stay encrypted in IndexedDB.
+ if(!await save())throw Error('Image metadata could not be saved on this device');
+ info(count+' image'+(count===1?'':'s')+' saved');
+}
+function refreshMediaComposer(){
+ var target=q('#composer-attachments');if(!target)return;
+ target.innerHTML=draftMediaRefs.length?draftMediaRefs.map(function(ref){return '<figure><img data-hq-media="'+esc(ref.slice(11))+'" alt="Attached image preview"><button class="btn" type="button" data-detach-media="'+esc(ref)+'">Remove</button></figure>'}).join(''):'<p class="muted">No images attached yet.</p>';
+ showMediaPreviews();
+}
+async function exportMedia(mediaId){
+ var item=(data.media||[]).find(function(x){return x.id===mediaId});if(!item)return;
+ var file=await mediaGet(mediaId),url=URL.createObjectURL(file),link=document.createElement('a');
+ link.href=url;link.download=item.name||'LIFE-image.png';link.click();setTimeout(function(){URL.revokeObjectURL(url)},1500);
+}
+async function makeBrandCard(){
+ var form=q('#postform');if(!form)throw Error('Open the post editor first');
+ var raw=(q('#card-headline')&&q('#card-headline').value.trim())||form.elements.title.value.trim()||'L-I-F-E';
+ var headline=raw.slice(0,90),canvas=document.createElement('canvas');canvas.width=canvas.height=1080;
+ var ctx=canvas.getContext('2d');if(!ctx)throw Error('Canvas unavailable');
+ ctx.fillStyle='#08080c';ctx.fillRect(0,0,1080,1080);
+ var colors=['#fa4e9d','#f9c548','#4acb91','#26cadb','#6b64ee'];
+ // Pure text/graphics only; no venue or ticket information is inserted.
+ var g=ctx.createLinearGradient(110,0,920,0);
+ ['#ff548b','#ffd049','#31d68f','#38c6ed','#9a65e9'].forEach(function(c,i){g.addColorStop(i/4,c)});
+ ctx.lineWidth=22;ctx.lineCap='round';ctx.strokeStyle=g;ctx.beginPath();ctx.moveTo(350,250);
+ ctx.bezierCurveTo(380,180,490,190,535,260);ctx.bezierCurveTo(600,360,730,290,730,240);
+ ctx.bezierCurveTo(730,150,595,190,535,260);ctx.bezierCurveTo(460,350,325,320,350,250);ctx.stroke();
+ ctx.textAlign='center';ctx.textBaseline='middle';
+ ctx.fillStyle='#fff';ctx.font='700 62px system-ui,sans-serif';ctx.fillText('L-I-F-E',540,130);
+ ctx.font='24px system-ui,sans-serif';ctx.fillText('Living IN FULL Ecosystem',540,188);
+ ctx.fillStyle=g;ctx.fillRect(160,365,760,9);
+ var words=headline.split(/\s+/),lines=[],line='';
+ for(var word of words){var tryLine=line?line+' '+word:word;if(ctx.measureText(tryLine).width>790&&line){lines.push(line);line=word}else line=tryLine}
+ if(line)lines.push(line);
+ var fontSize=headline.length>60?59:headline.length>36?70:88;
+ ctx.font='800 '+fontSize+'px system-ui,sans-serif';
+ // Rewrap using the actual title font size.
+ lines=[];line='';for(var word of words){var next=line?line+' '+word:word;if(ctx.measureText(next).width>820&&line){lines.push(line);line=word}else line=next}if(line)lines.push(line);
+ if(lines.length>4)throw Error('Shorten this headline to four lines');
+ var startY=575-(lines.length-1)*fontSize*.6;
+ lines.forEach(function(t,i){ctx.fillStyle=i===0?g:'#fff';ctx.fillText(t,540,startY+i*fontSize*1.18)});
+ ctx.fillStyle='#fff';ctx.font='33px system-ui,sans-serif';ctx.fillText('30 JANUARY 2027 · 3 PM · MILTON KEYNES',540,885);
+ ctx.fillStyle=g;ctx.fillRect(110,940,860,12);
+ var blob=await new Promise(function(resolve){canvas.toBlob(resolve,'image/png')});if(!blob)throw Error('Unable to create image');
+ var file=new File([blob],'LIFE-branded-'+Date.now()+'.png',{type:'image/png'});
+ await addMediaFiles([file],true);
+}
+q('#body').addEventListener('change',async function(e){
+ if(!['post-image-upload','library-image-upload'].includes(e.target.id))return;
+ try{await addMediaFiles(e.target.files,e.target.id==='post-image-upload')}catch(err){alert('Image upload failed: '+err.message)}
+});
+q('#body').addEventListener('click',async function(e){
+ var b=e.target.closest('button');if(!b||!data)return;
+ try{
+  if(b.dataset.action==='makebrandcard'){await makeBrandCard();return}
+  if(b.dataset.detachMedia){draftMediaRefs=draftMediaRefs.filter(function(x){return x!==b.dataset.detachMedia});refreshMediaComposer();return}
+  if(b.dataset.attachMedia){if(draftMediaRefs.length>=8)throw Error('Maximum 8 images in one post');var ref='localmedia:'+b.dataset.attachMedia;if(!draftMediaRefs.includes(ref))draftMediaRefs.push(ref);refreshMediaComposer();return}
+  if(b.dataset.useMedia){editing=null;navigate('post');draftMediaRefs=['localmedia:'+b.dataset.useMedia];refreshMediaComposer();return}
+  if(b.dataset.exportMedia){await exportMedia(b.dataset.exportMedia);return}
+  if(b.dataset.trashMedia){if(!confirm('Move this image to the recycle bin? It will remain available to any existing posts using it.'))return;moveToTrash('media',b.dataset.trashMedia);if(await save())navigate('media');return}
+ }catch(err){alert('Media action failed: '+err.message)}
+});
+q('#body').addEventListener('dragover',function(e){if(e.target.closest('#media-drop')){e.preventDefault();q('#media-drop').classList.add('dragover')}});
+q('#body').addEventListener('dragleave',function(e){if(e.target.closest('#media-drop'))q('#media-drop').classList.remove('dragover')});
+q('#body').addEventListener('drop',async function(e){if(!e.target.closest('#media-drop'))return;e.preventDefault();q('#media-drop').classList.remove('dragover');try{await addMediaFiles(e.dataTransfer.files,false)}catch(err){alert(err.message)}});
 
 /* Recycle bin stores original records inside the encrypted workspace. */
 function moveToTrash(kind,ref){
