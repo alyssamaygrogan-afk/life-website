@@ -1,0 +1,22 @@
+# Cloudflare Workers Free. Create a KV namespace before deploying.
+name = "life-hq-meta-bridge"
+main = "worker.js"
+compatibility_date = "2026-10-26"
+workers_dev = true
+
+[vars]
+SITE_ORIGIN = "https://lifeinfullecosystem.org"
+GRAPH_VERSION = "v26.0"
+# Set META_REDIRECT_URI to your actual Worker hostname before deploying.
+META_REDIRECT_URI = "https://REPLACE-ME.workers.dev/oauth/callback"
+
+# Create a free KV namespace and replace the ID:
+[[kv_namespaces]]
+binding = "META_KV"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+# Set these as Cloudflare encrypted Secrets, NEVER in this file:
+# META_APP_ID — Meta App ID (public ID, but configure on server)
+# META_APP_SECRET — Meta app secret
+# HQ_ADMIN_KEY — a distinct random secret of 32+ characters
+# META_TOKEN_ENCRYPTION_KEY — base64url encoding of 32 random bytes
