@@ -617,6 +617,59 @@ q('#body').addEventListener('change',async function(e){
  }
 });
 
+
+var lifeSevenImageCopy=[["2026-10-26","neon_rainbow_96_day_countdown.png","Monday — 96 days: Something extraordinary is coming","🌈 96 DAYS TO GO!","Something extraordinary is coming to Milton Keynes.","L-I-F-E launches on Saturday 30 January 2027 at 3 PM UK. A journey built around honesty, equality, learning and protection. 💜","Black L-I-F-E card with a glowing rainbow 96 DAYS TO GO, the words Something extraordinary is coming to Milton Keynes and a rainbow heart."],["2026-10-27","living_in_full_95_days_to_go.png","Tuesday — 95 days: What does living IN FULL mean to you?","💜 What does living IN FULL mean to you?","Different answers. A brighter future together.","Maybe it is being heard, feeling safe, having choices or being yourself. Tell us what living IN FULL means to you! 💬","Black L-I-F-E card asking What does living IN FULL mean to you? with rainbow infinity and heart, Different answers. A brighter future together, and 95 DAYS TO GO."],["2026-10-28","everyone_deserves_to_belong_94_days_to_go.png","Wednesday — 94 days: Everyone deserves to belong","🌈 EVERYONE DESERVES TO BELONG.","Different backgrounds. Different abilities. Different experiences. Equal worth.","Everyone deserves dignity, respect and a place to belong. 💜","Black L-I-F-E card reading EVERYONE DESERVES TO BELONG, with rainbow infinity and people outlines, Different backgrounds. Different abilities. Different experiences. Equal worth, and 94 DAYS TO GO."],["2026-10-29","milton_keynes_neon_countdown.png","Thursday — 93 days: Milton Keynes, something is coming!","📍 MILTON KEYNES, SOMETHING IS COMING!","Every big journey starts somewhere. For L-I-F-E, that journey begins right here in Milton Keynes.","The L-I-F-E launch takes place on 30 January 2027 at 3 PM UK. Follow the journey. 🌈","Black L-I-F-E card with a glowing rainbow map pin, MILTON KEYNES SOMETHING IS COMING, Every big journey starts somewhere, and 93 DAYS TO GO."],["2026-10-30","every_vision_has_a_story.png","Friday — 92 days: Every vision has a story","💜 EVERY VISION HAS A STORY.","Three sisters. A shared connection. A determination to help create a better future.","Alyssa-May, Heidi and Selina Grogan are the three founders of L-I-F-E. Selina’s memory remains at the heart of this journey. 🌈","Black L-I-F-E card with three connected rainbow hearts labelled Alyssa-May, Heidi and Selina, the words EVERY VISION HAS A STORY, and 92 DAYS TO GO."],["2026-10-31","neon_91_days_to_go_countdown.png","Saturday — 91 days: No tricks, just a brighter future!","🎃 91 DAYS TO GO!","No tricks, just a brighter future!","Happy Halloween! L-I-F-E launches in Milton Keynes on 30 January 2027 at 3 PM UK. 🌈🦇","Black Halloween L-I-F-E card with a glowing rainbow 91 DAYS TO GO, neon bats, pumpkins and the slogan No tricks, just a brighter future."],["2026-11-01","neon_rainbow_90_day_countdown.png","Sunday — 90 days: A new month, a brighter future","🌈 90 DAYS TO GO!","A new month. A brighter future. The countdown continues.","November begins with another milestone on our way to the L-I-F-E launch in Milton Keynes on 30 January 2027 at 3 PM UK. 💜","Black L-I-F-E card with giant glowing rainbow 90 DAYS TO GO, a heart and the message A new month. A brighter future. The countdown continues."]];
+async function updateSevenImageCaptions(){
+ if(!data||!key)throw Error('Unlock Social Media HQ first');
+ if(pendingSaves)throw Error('Finish saving the current draft first');
+ var matched=[],skipped=0;
+ lifeSevenImageCopy.forEach(function(row){
+  var date=row[0],imageName=row[1];
+  data.posts.forEach(function(p){
+   if(p.weeklyKey!=='LIFE-WEEK-'+date||p.date!==date||p.status!=='Draft')return;
+   if(String(p.assetRef||'').startsWith('localmedia:')){
+    var media=(data.media||[]).find(function(m){return m.id===p.assetRef.slice(11)});
+    if(media&&media.name!==imageName){skipped++;return}
+   }
+   matched.push({p:p,row:row});
+  });
+ });
+ if(!matched.length)throw Error(skipped?'The attached images do not match the post dates. No writing has been changed.':'No drafts for 26 October–1 November were found. Import the seven-image ZIP first.');
+ var count=matched.length;
+ if(!await confirmHQ('Rewrite the Facebook, Instagram, TikTok and LinkedIn captions for '+count+' matching private draft'+(count===1?'':'s')+'? Images, other dates and published posts will not be changed.','Match draft captions'))return;
+ await savePreImportRecovery();
+ var history=matched.map(function(x){return {post:x.p,title:x.p.title,caption:x.p.caption,platformCaptions:x.p.platformCaptions,altText:x.p.altText,reviewed:x.p.reviewed,reviewedAt:x.p.reviewedAt}});
+ try{
+  for(var x of matched){
+   var p=x.p,r=x.row,headline=r[3],onCard=r[4],more=r[5],day=Number(r[0].slice(-2)),days=day>=26?122-day:91-day;
+   var ending='#LIFE2027 #LivingINFull'+(r[0]==='2026-10-29'?' #MiltonKeynes':'');
+   p.title=r[2];
+   p.caption=headline+'\n\n'+onCard+'\n\n'+more+'\n\n'+(headline.includes('DAYS TO GO')?'':'🌈 '+days+' DAYS TO GO!\n\n')+ending;
+   p.platformCaptions={
+    Facebook:p.caption,
+    Instagram:headline+'\n\n'+onCard+'\n\n🌈 '+days+' days to go!\n'+ending,
+    TikTok:headline+' '+onCard+' 🌈 '+days+' days to go! '+ending,
+    LinkedIn:onCard+' '+more+' With '+days+' days until the L-I-F-E launch, follow the journey. #LIFE2027'
+   };
+   p.altText=r[6];
+   p.reviewed=false;p.reviewedAt='';
+  }
+  if(!await save({skipRender:true}))throw Error('The encrypted draft update could not be saved');
+  navigate('posts');
+  info(count+' draft captions matched to their images. Review before scheduling.');
+ }catch(err){
+  history.forEach(function(old){old.post.title=old.title;old.post.caption=old.caption;old.post.platformCaptions=old.platformCaptions;old.post.altText=old.altText;old.post.reviewed=old.reviewed;old.post.reviewedAt=old.reviewedAt});
+  throw err;
+ }
+}
+q('#body').addEventListener('click',async function(e){
+ var button=e.target.closest('button[data-action="match-seven-captions"]');
+ if(!button)return;
+ button.disabled=true;
+ try{await updateSevenImageCaptions()}catch(err){alert('No captions changed: '+err.message)}
+ finally{button.disabled=false}
+});
+
 /* Weekly media pack: each picture is encrypted before it is saved in device IndexedDB.
    The workspace password and derived key never leave this browser. */
 var mediaUrls=[];
