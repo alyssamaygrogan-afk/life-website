@@ -263,7 +263,7 @@ function posts(){
   var bySearch=!search||[x.title,x.caption,x.date,(x.networks||[]).join(' '),x.topic].join(' ').toLowerCase().includes(search);
   return byStatus&&bySearch;
  }).sort(function(a,b){return (a.date||'9999').localeCompare(b.date||'9999')});
- var out='<div class="tool-tabs" role="tablist" aria-label="Post status">'+['all'].concat(POST_STATUSES).map(function(v){return '<button type="button" role="tab" data-status-tab="'+esc(v)+'" aria-selected="'+String(postFilter===v)+'">'+(v==='all'?'All':esc(v))+' ('+(v==='all'?data.posts.length:data.posts.filter(function(p){return p.status===v}).length)+')</button>'}).join('')+'</div><div class="actions"><button class="btn primary" data-action="newpost">New post</button><button class="btn danger" data-action="trashselected" type="button">Move selected to bin</button><button class="btn" data-action="weekly">Prepare weekly drafts</button><button class="btn" data-action="prompts">Generate countdown drafts</button></div><div class="panel"><h3>Import the seven 26 Oct – 1 Nov drafts and images</h3><p>Select the <strong>LIFE-HQ-week-2026-10-26.json</strong> file and all seven PNG images from your unzipped L-I-F-E package. This replaces only <strong>draft</strong> posts for those seven days. Other posts, contacts and campaigns stay untouched. An encrypted backup downloads first. Artwork is stored encrypted on this device, not sent to Buffer.</p><label class="btn primary">Choose package files<input id="weekpackage" type="file" accept=".json,.png,image/png,application/json" multiple hidden></label></div>';
+ var out='<div class="tool-tabs" role="tablist" aria-label="Post status">'+['all'].concat(POST_STATUSES).map(function(v){return '<button type="button" role="tab" data-status-tab="'+esc(v)+'" aria-selected="'+String(postFilter===v)+'">'+(v==='all'?'All':esc(v))+' ('+(v==='all'?data.posts.length:data.posts.filter(function(p){return p.status===v}).length)+')</button>'}).join('')+'</div><div class="actions"><button class="btn primary" data-action="newpost">New post</button><button class="btn danger" data-action="trashselected" type="button">Move selected to bin</button><button class="btn" data-action="weekly">Prepare weekly drafts</button><button class="btn" data-action="prompts">Generate countdown drafts</button></div><div class="panel"><h3>Import the seven 26 Oct – 1 Nov drafts and images</h3><p>Select the <strong>LIFE-HQ-week-2026-10-26.json</strong> file and all seven PNG images from your unzipped L-I-F-E package. This replaces only <strong>draft</strong> posts for those seven days. Other posts, contacts and campaigns stay untouched. An encrypted backup downloads first. Artwork is stored encrypted on this device, not sent to Buffer.</p><label class="btn primary">Choose package files<input id="weekpackage" type="file" accept=".json,.png,image/png,application/json" multiple hidden></label><p id="week-import-status" role="status" aria-live="polite" class="muted">iPhone import fix applied · 26 October 2026. Select the JSON file and all seven PNGs together.</p></div>';
  out+='<div class="panel"><h3>Quick draft inbox</h3><p class="muted">Paste a new caption written here or prepared in ChatGPT. It becomes an unpublished L-I-F-E draft in this device workspace; no automatic publishing or internet sync.</p><label class="field">Draft caption<textarea id="quick-caption" maxlength="10000" rows="4" placeholder="Paste a caption or write a new L-I-F-E post..."></textarea></label><div class="actions"><button type="button" class="btn primary" data-action="quickdraft">Save as new draft</button><button type="button" class="btn" data-action="newpost">Open full editor</button></div></div>';
  out+='<div class="panel"><div class="post-tools"><label>Find a post<input id="postsearch" value="'+esc(postQuery)+'" placeholder="Title, caption or date"></label><label>Filter by status<select id="postfilter"><option value="all">All statuses</option>'+POST_STATUSES.map(function(v){return '<option value="'+esc(v)+'" '+(v===postFilter?'selected':'')+'>'+esc(v)+'</option>'}).join('')+'</select></label></div><p class="muted">Showing '+list.length+' of '+data.posts.length+' posts. Draft and scheduled dates are local planning only.</p></div>';
  out+='<div class="panel">'+(list.length?list.map(function(x){
@@ -539,7 +539,22 @@ q('#body').addEventListener('change',async function(e){
  data.accountSetups[id]=Object.assign({},prior,{[field]:el.checked});
  await save();
 });
-q('#body').addEventListener('change',async function(e){if(e.target.id==='weekpackage'){try{await importWeekPackage(e.target.files)}catch(err){alert('Package import not completed: '+err.message)}return}});
+q('#body').addEventListener('change',async function(e){
+ if(e.target.id!=='weekpackage')return;
+ var control=e.target,files=Array.from(control.files||[]),notice=q('#week-import-status');
+ if(notice){notice.textContent='Checking '+files.length+' selected files…';notice.style.color='#354665'}
+ try{
+  await importWeekPackage(files);
+  if(notice&&notice.isConnected){notice.textContent='Import finished. Check the seven draft posts above.';notice.style.color='#22695f'}
+ }catch(err){
+  if(notice&&notice.isConnected){notice.textContent='Import could not finish: '+err.message;notice.style.color='#922d37'}
+  info('Import was not completed. Previous drafts were kept.');
+ }finally{
+  // iOS Safari may not fire a second change event for the same file selection
+  // unless the chooser is cleared. This allows an immediate safe retry.
+  control.value='';
+ }
+});
 
 /* Weekly media pack: each picture is encrypted before it is saved in device IndexedDB.
    The workspace password and derived key never leave this browser. */
@@ -739,7 +754,9 @@ async function makeBrandCard(){
 }
 q('#body').addEventListener('change',async function(e){
  if(!['post-image-upload','library-image-upload'].includes(e.target.id))return;
- try{await addMediaFiles(e.target.files,e.target.id==='post-image-upload')}catch(err){alert('Image upload failed: '+err.message)}
+ var control=e.target;
+ try{await addMediaFiles(control.files,control.id==='post-image-upload')}catch(err){alert('Image upload failed: '+err.message)}
+ finally{control.value=''}
 });
 q('#body').addEventListener('click',async function(e){
  var b=e.target.closest('button');if(!b||!data)return;
