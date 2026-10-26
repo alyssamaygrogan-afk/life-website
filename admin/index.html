@@ -188,13 +188,14 @@ function lock(){
  if(pendingSaves){info('Please wait while your changes save');return}
  if(lastSaveFailed&&!confirm('Discard unsaved changes and lock the workspace?'))return;
  sessionStorage.setItem('life-hq-manual-lock','1');
- session++;key=null;saved=null;data=null;editing=null;contactEditing=null;lastSaveFailed=false;selectedPostIds.clear();draftMediaRefs=[];
+ metaBridgeRuntime={pages:[],status:null,message:''};session++;key=null;saved=null;data=null;editing=null;contactEditing=null;lastSaveFailed=false;selectedPostIds.clear();draftMediaRefs=[];
  mediaUrls.forEach(function(url){URL.revokeObjectURL(url)});mediaUrls=[];
  q('#body').replaceChildren();q('#app').classList.add('hidden');q('#signin').classList.remove('hidden');q('#password').value='';
  checkTrustedDevice().catch(function(){});q('#password').focus();
 }
 q('#lock').addEventListener('click',lock);
 async function finishLogin(result,remember){
+ metaBridgeRuntime={pages:[],status:null,message:''};
  key=result.key;data=result.data;
  if(!Array.isArray(data.trash))data.trash=[];
  if(!Array.isArray(data.media))data.media=[];
@@ -432,9 +433,10 @@ q('#body').addEventListener('click',async function(e){
    if(!choice)throw Error('Selected Page is no longer available');
    if(!await confirmHQ('Connect Facebook Page "'+choice.name+'"'+(choice.instagramUsername?' and Instagram @'+choice.instagramUsername:' (no linked Instagram found)')+' to HQ? This only connects accounts, it does not post.','Connect selected Page'))return;
    result=await metaBridgeRequest('/select','POST',{flow:data.metaBridge.flow,pageId:input.value});
-   metaBridgeRuntime.status=result;metaBridgeRuntime.pages=[];
+   metaBridgeRuntime.status=await metaBridgeRequest('/status','GET');
+   metaBridgeRuntime.pages=[];
    data.metaBridge.flow='';await save({skipRender:true});
-   metaBridgeRuntime.message='Selected Page connection saved. The backend still requires separate publishing integration and approvals.';
+   metaBridgeRuntime.message=metaBridgeRuntime.status.connected?'Your selected L-I-F-E Page is verified with Meta. Direct publishing still requires separate secure approvals.':'Page selected, but Meta could not verify its current access. Reauthorise if needed.';
   }else if(action==='disconnect'){
    if(!await confirmHQ('Disconnect the currently selected Meta Page from HQ? This does not remove access in Meta itself; revoke app permission in Meta settings if required.','Disconnect'))return;
    await metaBridgeRequest('/disconnect','POST',{});
