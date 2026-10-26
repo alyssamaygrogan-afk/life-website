@@ -314,6 +314,7 @@ function connections(){
  var progress=data.accountSetups||{},started=SOCIAL_PLATFORMS.filter(function(p){return progress[p.id]&&progress[p.id].created}).length;
  var html='<div class="panel hero"><h3>New L-I-F-E accounts</h3><p>Use alyssa-may.grogan@lifeinfullecosystem.org for eligible new account registrations. Each setup step is saved only in your encrypted device workspace.</p><p><strong>'+started+' of '+SOCIAL_PLATFORMS.length+' accounts marked created</strong> · No platform APIs are connected yet.</p></div>';
  html+='<div class="warn"><strong>Account setup is not API connection.</strong> These checkboxes are a private checklist, not proof that an account exists or that posting/advertising is authorized. Never enter passwords, recovery codes or API tokens into this dashboard. Real connections require approved OAuth and protected server-side storage. This app cannot spend money or publish automatically.</div>';
+ html+=metaBridgePanel();
  html+='<div class="panel"><h3>Manual Buffer scheduling</h3><p>You can already copy a reviewed caption from Posts and open Buffer to schedule it on your L-I-F-E accounts yourself. Each account must first be genuinely connected to Buffer. This shortcut is not an API connection and cannot post automatically.</p><a class="btn connection-link" href="https://publish.buffer.com/" target="_blank" rel="noopener noreferrer">Open Buffer ↗</a></div>';
  html+='<div class="panel"><h3>Before creating accounts</h3><ol class="connections-guide"><li>Use unique passwords privately and enable two-factor authentication on every account.</li><li>Use the charity name and consistent logo, website and contact email. Keep personal social identities out of the public profiles.</li><li>For Facebook and LinkedIn, follow platform rules for real administrators; use role access for Heidi or other trustees rather than sharing login details.</li><li>Do not add payment details or start a campaign until the charity approves its budget and billing ownership.</li></ol></div>';
  ['Social','Advertising'].forEach(function(group){
@@ -329,6 +330,120 @@ function connections(){
  });
  return html+'<div class="warn">No social API, advertising API, automatic scheduling or payment action is enabled. Platform app approvals and a private OAuth backend are still required.</div>';
 }
+
+
+/* Direct Meta connection; tokens are NEVER exposed to this browser.
+   HQ stores only your Worker URL and distinct bridge access key in
+   the existing encrypted private device workspace. */
+var metaBridgeRuntime={pages:[],status:null,message:''};
+function metaBridgeWorkerUrl(value){
+ var u;
+ try{u=new URL(String(value||'').trim())}catch(e){throw Error('Enter your own Cloudflare Worker HTTPS address')}
+ if(u.protocol!=='https:'||u.username||u.password||u.port||u.search||u.hash||u.pathname!=='/'||!(u.hostname.endsWith('.workers.dev')||u.hostname==='api.lifeinfullecosystem.org'))throw Error('Use your own secure .workers.dev URL (or configured L-I-F-E API domain), with no extra path or parameters');
+ return u.origin;
+}
+function metaBridgePanel(){
+ var c=data.metaBridge||{},configured=!!(c.workerUrl&&c.accessKey),r=metaBridgeRuntime;
+ var connected=r.status&&r.status.connected===true;
+ var selected=r.status&&r.status.page;
+ var statusLine=connected?
+   '<span class="status-ok">Meta API verified</span><p><strong>Facebook Page:</strong> '+esc(selected.name)+'<br><strong>Instagram:</strong> '+(selected.instagramUsername?'@'+esc(selected.instagramUsername):'Not linked or not available to this Meta login')+'</p><p class="muted">This is a verified connection only. HQ cannot publish through this connection yet.</p>':
+   r.status&&r.status.reason?'<p class="danger-text">'+esc(r.status.reason)+'</p>':
+   '<span class="status-pending">Not yet connected</span>';
+ var pages=(r.pages||[]).map(function(p){
+  return '<option value="'+esc(p.id)+'">'+esc(p.name)+(p.instagramUsername?' — Instagram @'+esc(p.instagramUsername):' — no linked professional Instagram')+'</option>';
+ }).join('');
+ return '<div class="panel" id="meta-connect-panel"><div class="connection-header"><h3>Direct Meta connection · Facebook + Instagram</h3>'+statusLine+'</div>'
+  +'<p>Connect only the authorised L-I-F-E Facebook Page and its linked professional Instagram profile, using Meta’s own sign-in. <strong>No paid subscription is required for this setup.</strong> Nothing will publish or spend money automatically.</p>'
+  +'<details><summary>First-time setup: Meta developer app + free Cloudflare Worker</summary><ol class="connections-guide">'
+  +'<li>Check the L-I-F-E Facebook Page and Instagram Professional account are linked in Meta Business Suite.</li>'
+  +'<li>Set up the official <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener noreferrer">Meta developer app</a> with Facebook Login for Business. Only authorised people should approve access.</li>'
+  +'<li>Use the <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener noreferrer">Cloudflare Workers Free</a> tier with a KV namespace to host the secure Meta callback and protect tokens.</li>'
+  +'<li>Deploy the <a href="https://github.com/alyssamaygrogan-afk/life-website/tree/main/meta-bridge" target="_blank" rel="noopener noreferrer">L-I-F-E Meta bridge source and setup guide</a>. Add the Meta app credentials, private bridge key and encryption key as Cloudflare secrets—not to GitHub or ChatGPT.</li>'
+  +'<li>Paste your own Worker URL and private <em>bridge access key</em> below. Authorise with Meta and explicitly select the L-I-F-E Page.</li></ol></details>'
+  +'<form id="meta-bridge-form"><label class="field">Your deployed Cloudflare Worker URL<input name="workerUrl" placeholder="https://life-hq-meta-bridge.example.workers.dev/" type="url" autocomplete="url" value="'+esc(c.workerUrl||'')+'" maxlength="220"></label>'
+  +'<label class="field">Private HQ bridge access key (not your Meta password)<input name="accessKey" type="password" autocomplete="off" minlength="32" placeholder="'+(c.accessKey?'Access key already saved encrypted on this device':'Enter a new 32+ character key from Cloudflare')+'" maxlength="256"></label>'
+  +'<label class="setup-check"><input type="checkbox" name="consent" required> I confirm this is my own Worker and the L-I-F-E accounts will be connected with permission.</label>'
+  +'<div class="actions"><button type="submit" class="btn primary">Save secure connection settings</button>'
+  +'<button class="btn" type="button" data-meta-command="check" '+(!configured?'disabled':'')+'>Check connection</button>'
+  +'<button class="btn" type="button" data-meta-command="start" '+(!configured?'disabled':'')+'>Authorise with Meta</button>'
+  +'<button class="btn" type="button" data-meta-command="candidates" '+(!configured||!c.flow?'disabled':'')+'>Check available Pages</button>'
+  +'<button class="btn danger" type="button" data-meta-command="disconnect" '+(!configured?'disabled':'')+'>Disconnect</button></div></form>'
+  +(r.pages&&r.pages.length?'<div class="panel"><h4>Choose your L-I-F-E Page</h4><p class="muted">Do not select your personal Facebook Page. Only an account you are authorised to connect.</p><label class="field">Meta Page<select id="meta-page-choice">'+pages+'</select></label><button class="btn primary" type="button" data-meta-command="select">Connect selected L-I-F-E Page</button></div>':'')
+  +(r.message?'<p role="status" class="muted">'+esc(r.message)+'</p>':'')
+  +'<p class="muted">The Meta app and Cloudflare connection must be set up before the buttons can authorise an account. The existing Buffer shortcut remains available. This panel does not yet post or schedule directly.</p></div>';
+}
+async function metaBridgeRequest(endpoint,method,body){
+ var c=data.metaBridge||{};
+ if(!c.workerUrl||!c.accessKey)throw Error('Save the Worker URL and bridge access key first');
+ var base=metaBridgeWorkerUrl(c.workerUrl),options={method:method||'GET',headers:{'X-LIFE-HQ-Key':c.accessKey}};
+ if(body!==undefined){options.headers['Content-Type']='application/json';options.body=JSON.stringify(body)}
+ var url=base+endpoint,res;
+ try{res=await fetch(url,options)}catch(e){throw Error('Cannot reach your Worker. Check the URL, Cloudflare deployment and allowed CORS site origin.')}
+ var result=await res.json().catch(()=>null);
+ if(!res.ok||!result||result.service!=='life-hq-meta-bridge'&&res.ok)throw Error(result&&result.error||'The response was not from a configured L-I-F-E Meta bridge');
+ return result;
+}
+async function metaBridgeCheckHealth(base){
+ var result,res;
+ try{res=await fetch(metaBridgeWorkerUrl(base)+'/health',{cache:'no-store'});result=await res.json()}catch(e){throw Error('Could not reach the Worker health check. Make sure it has been deployed.')}
+ if(!res.ok||!result||result.service!=='life-hq-meta-bridge')throw Error('This is not a recognised L-I-F-E Meta bridge');
+ if(!result.ready)throw Error('Worker is not ready. Configure all required Cloudflare secrets, KV and callback URL first.');
+ return result;
+}
+q('#body').addEventListener('submit',async function(e){
+ if(e.target.id!=='meta-bridge-form')return;
+ e.preventDefault();var f=new FormData(e.target);
+ var base,secret;
+ try{
+  base=metaBridgeWorkerUrl(String(f.get('workerUrl')||'')),secret=String(f.get('accessKey')||'').trim()||(data.metaBridge&&data.metaBridge.accessKey)||'';
+  if(secret.length<32||secret.length>256)throw Error('Bridge access key must be a unique, privately stored secret with at least 32 characters');
+  await metaBridgeCheckHealth(base);
+  var old=data.metaBridge||{};
+  data.metaBridge={workerUrl:base,accessKey:secret,flow:old.workerUrl===base?old.flow||'':''};
+  if(await save()){metaBridgeRuntime.message='Settings saved encrypted on this device. Select Authorise with Meta when ready.';navigate('connections')}
+ }catch(err){metaBridgeRuntime.message='Settings not saved: '+err.message;render()}
+});
+q('#body').addEventListener('click',async function(e){
+ var b=e.target.closest('button[data-meta-command]');if(!b||!data)return;
+ b.disabled=true;
+ try{
+  var action=b.dataset.metaCommand,result;
+  if(action==='check'){
+   result=await metaBridgeRequest('/status','GET');
+   metaBridgeRuntime.status=result;
+   metaBridgeRuntime.message=result.connected?'Connected Page verified with Meta. Publishing remains disabled.':'No active connection verified yet.'+(result.reason?' '+result.reason:'');
+  }else if(action==='start'){
+   if(!await confirmHQ('Sign in on Meta and grant the selected permissions to L-I-F-E Social Media HQ. No posts will be published. Make sure this is the authorised L-I-F-E Facebook admin account.','Continue to Meta'))return;
+   result=await metaBridgeRequest('/auth/start','POST',{});
+   if(!result.url||!result.flow||!/^https:\/\/www\.facebook\.com\//.test(result.url))throw Error('Meta authorisation link not returned');
+   data.metaBridge.flow=result.flow;
+   if(!await save({skipRender:true}))throw Error('Could not save the pending Meta authorisation');
+   location.assign(result.url);return;
+  }else if(action==='candidates'){
+   if(!data.metaBridge.flow)throw Error('First select Authorise with Meta');
+   result=await metaBridgeRequest('/candidates?flow='+encodeURIComponent(data.metaBridge.flow),'GET');
+   metaBridgeRuntime.pages=Array.isArray(result.pages)?result.pages:[];
+   metaBridgeRuntime.message=metaBridgeRuntime.pages.length?'Select only the authorised L-I-F-E Page from the list.':'No Meta Pages returned; check your Facebook Page role.';
+  }else if(action==='select'){
+   var input=q('#meta-page-choice');
+   if(!input||!input.value)throw Error('Choose the L-I-F-E Page');
+   var choice=metaBridgeRuntime.pages.find(function(p){return p.id===input.value});
+   if(!choice)throw Error('Selected Page is no longer available');
+   if(!await confirmHQ('Connect Facebook Page "'+choice.name+'"'+(choice.instagramUsername?' and Instagram @'+choice.instagramUsername:' (no linked Instagram found)')+' to HQ? This only connects accounts, it does not post.','Connect selected Page'))return;
+   result=await metaBridgeRequest('/select','POST',{flow:data.metaBridge.flow,pageId:input.value});
+   metaBridgeRuntime.status=result;metaBridgeRuntime.pages=[];
+   data.metaBridge.flow='';await save({skipRender:true});
+   metaBridgeRuntime.message='Selected Page connection saved. The backend still requires separate publishing integration and approvals.';
+  }else if(action==='disconnect'){
+   if(!await confirmHQ('Disconnect the currently selected Meta Page from HQ? This does not remove access in Meta itself; revoke app permission in Meta settings if required.','Disconnect'))return;
+   await metaBridgeRequest('/disconnect','POST',{});
+   metaBridgeRuntime.status=null;metaBridgeRuntime.pages=[];metaBridgeRuntime.message='The L-I-F-E HQ connection was cleared from the secure Worker.';
+  }
+  navigate('connections');
+ }catch(err){metaBridgeRuntime.message=String(err.message||err);navigate('connections')}
+ finally{if(b.isConnected)b.disabled=false}
+});
 
 var ADS_CHANNELS=['Meta Facebook/Instagram Ads','Google Ads','TikTok Ads','LinkedIn Ads','Local print / events','Other paid publicity'];
 var AD_GOALS=['Launch awareness','Free ticket reservations','Supporter ticket interest','Website visits','Donations','Volunteer interest'];
