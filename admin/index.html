@@ -1353,7 +1353,13 @@ async function importProfilePackage(fileList){
  if(!Array.isArray(pack.posts)||pack.posts.length<1||pack.posts.length>7||pack.posts.length!==files.length-1)
   throw Error('Include one to seven posts and exactly one different PNG per post');
  var seen=new Set(),images=new Map(files.filter(function(f){return f.name.endsWith('.png')}).map(function(f){return [f.name,f]}));
- var fingerprint=new Uint8Array(await crypto.subtle.digest('SHA-256',await manifest[0].arrayBuffer()));
+ var hashes=[new Uint8Array(await crypto.subtle.digest('SHA-256',await manifest[0].arrayBuffer()))];
+ for(var imageName of Array.from(images.keys()).sort()){
+  hashes.push(new Uint8Array(await crypto.subtle.digest('SHA-256',await images.get(imageName).arrayBuffer())));
+ }
+ var packedHashes=new Uint8Array(hashes.reduce(function(total,item){return total+item.length},0)),offset=0;
+ hashes.forEach(function(item){packedHashes.set(item,offset);offset+=item.length});
+ var fingerprint=new Uint8Array(await crypto.subtle.digest('SHA-256',packedHashes));
  var packageId='profile-'+activeProfileId+'-'+Array.from(fingerprint).map(function(n){return n.toString(16).padStart(2,'0')}).join('');
  if(data.posts.some(function(p){return p.importPackageId===packageId})||
   (data.trash||[]).some(function(t){return t.kind==='post'&&t.record&&t.record.importPackageId===packageId}))
