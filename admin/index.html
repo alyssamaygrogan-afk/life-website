@@ -238,7 +238,7 @@ function renderProfileSwitcher(){
  var context=q('#hq-profile-context');if(context)context.textContent=profileName()+' • Private planning workspace';
 }
 async function switchProfile(next){
- if(!data||!key||pendingSaves||mediaUploadBusy){info('Finish saving before switching');return}
+ if(!data||!key||pendingSaves||mediaUploadBusy){info('Finish uploading pictures or saving before switching profiles');return}
  if(!data.profiles.some(function(p){return p.id===next}))return;
  if(next===activeProfileId)return;
  if(['post','contact','ad'].includes(section)&&!await confirmHQ('Leave the current editor? Any unsaved changes will be lost.','Switch profile'))return;
@@ -354,7 +354,7 @@ async function decrypt(p,r){
 }
 function info(s){var el=q('#status');el.textContent=s;el.classList.remove('hidden');setTimeout(function(){if(el.textContent===s)el.classList.add('hidden')},2900)}
 function lock(){
- if(pendingSaves||mediaUploadBusy){info('Please wait while your changes save');return}
+ if(pendingSaves||mediaUploadBusy){info('Please wait until pictures finish uploading or changes finish saving');return}
  if(lastSaveFailed&&!confirm('Discard unsaved changes and lock the workspace?'))return;
  sessionStorage.setItem('life-hq-manual-lock','1');
  metaBridgeRuntime={pages:[],status:null,message:''};session++;key=null;saved=null;data=null;editing=null;contactEditing=null;lastSaveFailed=false;selectedPostIds.clear();draftMediaRefs=[];
