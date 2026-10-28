@@ -1572,15 +1572,47 @@ function chooseWeeklyRecovery(snapshots){
   if(typeof dlg.showModal==='function')dlg.showModal();else dlg.setAttribute('open','');
  });
 }
+
+async function restoreWeeklyPostsFromRecovery(backup,previous){
+ var week=backup.weekStart;
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(week||'')||!Array.isArray(backup.replacedPostIds)||!Array.isArray(backup.importedPostIds)||
+  backup.replacedPostIds.length>7||backup.importedPostIds.length!==7)throw Error('Recovery metadata is incomplete');
+ var dates=Array.from({length:7},function(_,i){return addDays(week,i)});
+ var originals=new Set(backup.replacedPostIds),imports=new Set(backup.importedPostIds);
+ var old=previous.posts.filter(function(p){return originals.has(p.id)&&profileOf(p)==='life'&&dates.includes(p.date)&&p.weeklyKey==='LIFE-WEEK-'+p.date});
+ if(old.length!==originals.size)throw Error('Some original posts were missing from the recovery copy');
+ var current=data.posts.filter(function(p){return imports.has(p.id)&&profileOf(p)==='life'&&dates.includes(p.date)});
+ if(data.posts.some(function(p){return imports.has(p.id)&&!current.includes(p)}))throw Error('An imported post now belongs to another date or profile; automatic recovery stopped');
+ if(current.some(function(p){return ['Published','Scheduled manually'].includes(p.status)}))throw Error('An imported post is recorded as scheduled/published. Restore it manually to protect its external posting record.');
+ var message='Restore earlier L-I-F-E drafts for '+week+' to '+dates[6]+'? '+current.length+' imported posts will be removed from Posts and '+old.length+' earlier drafts recovered. Other projects and all pictures will be retained. Edits to these imported posts will be lost.';
+ if(!await confirmHQ(message,'Restore this week only'))return;
+ var beforePosts=data.posts,beforeTrash=data.trash||[];
+ try{
+  var preserved=beforePosts.filter(function(p){return !current.includes(p)});
+  var existing=new Set(preserved.map(function(p){return p.id}));
+  data.posts=preserved.concat(old.filter(function(p){return !existing.has(p.id)}));
+  data.trash=beforeTrash.filter(function(t){return !(t.kind==='post'&&t.record&&originals.has(t.record.id))});
+  validateWorkspace(data);
+  if(!await save({skipRender:true}))throw Error('Could not save the restored post records');
+  navigate('posts');info('Earlier weekly drafts restored. Other profiles and images were preserved.');
+ }catch(err){data.posts=beforePosts;data.trash=beforeTrash;throw err}
+}
+
 async function recoverBeforeWeekImport(){
  if(!key||!data)throw Error('Unlock this workspace before restoring');
- var backup=await recoveryRecord('get');
- if(!backup)throw Error('No previous weekly-import restore point was found on this device');
+ var choices=(await recoveryRecord('list')).filter(function(r){return r&&r.workspace&&Array.isArray(r.media)&&(r.id==='before-week-import'||/^before-week-import-\d/.test(r.id||''))});
+ if(!choices.length)throw Error('No encrypted recovery points were found on this device');
+ choices.sort(function(a,b){return String(b.createdAt||'').localeCompare(String(a.createdAt||''))});
+ var selected=await chooseWeeklyRecovery(choices);if(!selected)return;
+ var backup=choices.find(function(r){return r.id===selected});
+ if(!backup)throw Error('This recovery point is no longer available');
  if(!backup.workspace||!Array.isArray(backup.media))throw Error('The saved restore point is invalid');
  if(!saved||saved.salt!==backup.workspace.salt)throw Error('The restore point belongs to another workspace password. Restore the separately saved complete backup instead.');
  var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:un64(backup.workspace.iv)},key,un64(backup.workspace.payload));
  var previous=validateWorkspace(JSON.parse(dec.decode(plain)));
- if(!await confirmHQ('Restore your workspace and all locally stored artwork to just before the last weekly import? This will replace changes made since the import. Please make a full backup first if you need to keep them.','Restore previous drafts'))return;
+ if(backup.kind==='weekly-package')return restoreWeeklyPostsFromRecovery(backup,previous);
+ if(!await confirmHQ('OLDER recovery point: this will replace every profile, every post and every picture, including newer Bears Adventures work. Save a complete backup of your CURRENT workspace first. Continue only if you want to discard changes made since this old snapshot.','Continue to full restore'))return;
+ if(!await confirmHQ('Final confirmation: replace ALL profiles, posts, pictures and settings with the old snapshot? This cannot be undone without another complete backup.','Replace everything'))return;
  var currentStored=localStorage.getItem(STORAGE),currentMedia=await allEncryptedMedia(),originalData=data,originalSaved=saved;
  try{
   await replaceEncryptedMedia(backup.media);
