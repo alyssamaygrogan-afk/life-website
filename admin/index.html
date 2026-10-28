@@ -1339,20 +1339,34 @@ function mediaLibrary(){
 async function addMediaFiles(files,attach){
  var list=Array.from(files||[]);
  if(!list.length)return;
+ if(!data||!key||pendingSaves)throw Error('Wait for the current save or unlock HQ first');
  if(list.length>20)throw Error('Upload 20 images at a time or fewer');
  if(attach&&draftMediaRefs.length+list.length>8)throw Error('A post supports up to 8 images');
- var count=0;
- for(var file of list){
-  var mediaId='upload-'+id();
-  var verifiedType=await mediaPut(mediaId,file);
-  data.media.push({id:mediaId,profileId:activeProfileId,name:String(file.name||'Image').slice(0,250),type:verifiedType,size:file.size,altText:'',createdAt:new Date().toISOString(),source:'upload'});
-  if(attach)draftMediaRefs.push('localmedia:'+mediaId);
-  count++;
+ var oldMedia=data.media.slice(),oldRefs=draftMediaRefs.slice(),written=[],count=0;
+ var form=attach?q('#postform'):null,oldFormat=form&&form.elements.format?form.elements.format.value:null;
+ try{
+  for(var file of list){
+   var mediaId='upload-'+id();
+   var verifiedType=await mediaPut(mediaId,file);
+   written.push(mediaId);
+   data.media.push({id:mediaId,profileId:activeProfileId,name:String(file.name||'Image').slice(0,250),type:verifiedType,size:file.size,altText:'',createdAt:new Date().toISOString(),source:'upload'});
+   if(attach)draftMediaRefs.push('localmedia:'+mediaId);
+   count++;
+  }
+  if(attach){
+   if(form&&form.elements.format&&form.elements.format.value==='Text')form.elements.format.value=draftMediaRefs.length>1?'Carousel':'Image';
+   refreshMediaComposer();
+  }
+  /* Image blobs and workspace metadata are separate stores; compensate on any failure. */
+  if(!await save(attach?{skipRender:true}:undefined))throw Error('Image metadata was not saved on this device');
+  info(count+' image'+(count===1?'':'s')+' saved');
+ }catch(err){
+  data.media=oldMedia;draftMediaRefs=oldRefs;
+  if(form&&oldFormat!==null&&form.elements.format)form.elements.format.value=oldFormat;
+  for(var mediaId of written){try{await mediaRemove(mediaId)}catch(cleanupErr){console.warn('Image upload cleanup failed',cleanupErr)}}
+  if(attach)refreshMediaComposer();
+  throw Error('Image upload was rolled back: '+err.message);
  }
- if(attach){var composer=q('#postform');if(composer&&composer.elements.format&&composer.elements.format.value==='Text')composer.elements.format.value=draftMediaRefs.length>1?'Carousel':'Image';refreshMediaComposer()}
- // Only the media metadata is in workspace JSON; binary images stay encrypted in IndexedDB.
- if(!await save(attach?{skipRender:true}:undefined))throw Error('Image metadata could not be saved on this device');
- info(count+' image'+(count===1?'':'s')+' saved');
 }
 function refreshMediaComposer(){
  var target=q('#composer-attachments');if(!target)return;
