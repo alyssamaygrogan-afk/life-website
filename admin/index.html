@@ -439,6 +439,15 @@ function postMediaProblems(p){
  }
  return problems;
 }
+async function ensureStoredMediaReadable(p){
+ if(!isPublicStatus(p.status)||!['Image','Carousel'].includes(p.format))return;
+ var refs=Array.isArray(p.mediaRefs)&&p.mediaRefs.length?p.mediaRefs:
+  (String(p.assetRef||'').startsWith('localmedia:')?[p.assetRef]:[]);
+ for(var ref of refs){
+  try{await mediaGet(ref.slice(11))}
+  catch(err){throw Error('An attached image cannot be opened on this device. Restore or reattach the actual picture before approval.')}
+ }
+}
 function releaseChecks(p,reviewed,postedExternally){
  var problems=[],tag=p.topic||'General';
  if(isPublicStatus(p.status)&&!reviewed)problems.push('Confirm that you reviewed this version of the post before marking it ready.');
@@ -992,6 +1001,7 @@ q('#body').addEventListener('submit',async function(e){
     return formProblem('#postformerror','This post changed since it was last approved. Untick then tick the review confirmation again before saving it as approved.');
    var errors=releaseChecks(p,f.has('reviewed'),f.has('postedExternally'));
    if(errors.length)return formProblem('#postformerror',errors.join(' '));
+   await ensureStoredMediaReadable(p);
    var beforePosts=data.posts;
    data.posts=data.posts.filter(function(z){return z.id!==p.id});data.posts.push(p);
    var stored=await save({skipRender:true});
@@ -1308,7 +1318,7 @@ async function importWeekPackage(fileList){
   throw Error(label+': '+err.message+'. Your previous drafts were kept.');
  }
 }
-q('#body').addEventListener('change',async function(e){if(e.target.id!=='backupfile'||!e.target.files.length)return;try{var file=e.target.files[0];if(file.size>6000000)throw Error('Backup too large');var r=JSON.parse(await file.text());if(pendingSaves)throw Error('Wait until the current save finishes');if(!confirm('Replace all local workspace data with this backup?'))return;var p=prompt('Enter the password used for this backup');if(!p)return;var output=await decrypt(p,r);localStorage.setItem(STORAGE,JSON.stringify(r));session++;key=output.key;saved=r;data=output.data;data.trash=data.trash||[];data.media=data.media||[];data.brand=data.brand||{};lastSaveFailed=false;await forgetThisDevice();applyBrand();render();info('Posts-only backup restored. Images require a complete backup.')}catch(err){info('Backup could not be restored')}})
+q('#body').addEventListener('change',async function(e){if(e.target.id!=='backupfile'||!e.target.files.length)return;try{var file=e.target.files[0];if(file.size>6000000)throw Error('Backup too large');var r=JSON.parse(await file.text());if(pendingSaves)throw Error('Wait until the current save finishes');if(!confirm('Replace all local workspace data with this backup?'))return;var p=prompt('Enter the password used for this backup');if(!p)return;var output=await decrypt(p,r);localStorage.setItem(STORAGE,JSON.stringify(r));session++;key=output.key;saved=r;data=output.data;data.trash=data.trash||[];data.media=data.media||[];data.brand=data.brand||{};ensureProfiles();lastSaveFailed=false;await forgetThisDevice();applyBrand();render();info('Posts-only backup restored. Images require a complete backup.')}catch(err){info('Backup could not be restored')}})
 
 
 
@@ -1535,7 +1545,7 @@ async function recoverBeforeWeekImport(){
   await replaceEncryptedMedia(backup.media);
   localStorage.setItem(STORAGE,JSON.stringify(backup.workspace));
   saved=backup.workspace;data=previous;
-  data.trash=data.trash||[];data.media=data.media||[];data.brand=data.brand||{};
+  data.trash=data.trash||[];data.media=data.media||[];data.brand=data.brand||{};ensureProfiles();
   session++;lastSaveFailed=false;selectedPostIds.clear();applyBrand();navigate('posts');
   info('Earlier drafts and media were restored from the encrypted local recovery copy');
  }catch(err){
@@ -1563,7 +1573,7 @@ async function restoreFullBackup(file){
  var prev=await allEncryptedMedia(),prevStored=localStorage.getItem(STORAGE);
  try{
   await replaceEncryptedMedia(rows);localStorage.setItem(STORAGE,JSON.stringify(pack.workspace));await forgetThisDevice();
-  session++;key=output.key;saved=pack.workspace;data=output.data;data.trash=data.trash||[];data.media=data.media||[];data.brand=data.brand||{};lastSaveFailed=false;
+  session++;key=output.key;saved=pack.workspace;data=output.data;data.trash=data.trash||[];data.media=data.media||[];data.brand=data.brand||{};ensureProfiles();lastSaveFailed=false;
   applyBrand();navigate('home');info('Complete encrypted backup restored');
  }catch(err){try{await replaceEncryptedMedia(prev)}catch(undo){}if(prevStored)localStorage.setItem(STORAGE,prevStored);throw err}
 }
@@ -1660,6 +1670,8 @@ q('#body').addEventListener('click',async function(e){
     var visibleBin=(data.trash||[]).filter(function(item){return inProfile(item.record)});
     if(!visibleBin.length)return info('The recycle bin for '+profileName()+' is empty');
     if(!await confirmHQ('Permanently delete '+visibleBin.length+' items for '+profileName()+' only? All other profiles will be kept. Make a backup first if needed.','Empty this profile bin'))return;
+    var usedImages=visibleBin.filter(function(x){return x.kind==='media'&&mediaReferenceCount(x.record.id)>0});
+    if(usedImages.length){info('Cannot empty bin: '+usedImages.length+' image(s) are still referenced by saved or recycled posts.');return}
     for(var item of visibleBin.slice())await permanentlyRemove(item.id);
     if(await save())navigate('trash');return}
  }catch(err){info('Action failed: '+err.message)}
@@ -1726,6 +1738,8 @@ async function verifyRecords(posts){
  if(!posts.length)return info('Select posts first');
  var problems=[];posts.forEach(function(p){readyIssues(p).forEach(function(x){problems.push(p.title+': '+x)})});
  if(problems.length){alert('These posts need changes before approval:\n\n'+problems.slice(0,12).join('\n'));return}
+ try{for(var p of posts)await ensureStoredMediaReadable(Object.assign({},p,{status:'Ready'}))}
+ catch(err){info('Approval blocked: '+err.message);return}
  if(!await reviewDialog(posts))return;
  var reviewedAt=new Date().toISOString();
  await changePosts(posts,function(p){p.status='Ready';p.reviewed=true;p.reviewedAt=reviewedAt},posts.length+' reviewed post(s) marked Ready (not published)');
