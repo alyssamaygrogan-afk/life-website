@@ -2187,44 +2187,76 @@ async function verifyRecords(posts){
  var reviewedAt=new Date().toISOString();
  await changePosts(posts,function(p){p.status='Ready';p.reviewed=true;p.reviewedAt=reviewedAt},posts.length+' reviewed post(s) marked Ready (not published)');
 }
-function requestPublishedUrl(post){
+/* User-entered result: never treat it as API-verified Buffer activity. */
+function requestManualPublicationRecord(post,preferred){
  return new Promise(function(resolve){
-  var d=document.createElement('dialog');d.className='hq-review-dialog';
-  d.innerHTML='<h2>Record a post already published</h2><p><strong>'+esc(post.title)+'</strong></p><p>This does not publish anything. Only use this after checking the real post on the correct '+esc(profileName())+' social account. One URL records one actual publication, not every platform.</p>'
-   +'<label class="field">Public post URL<input type="url" placeholder="https://..." data-pub-url></label><label class="setup-check"><input type="checkbox" data-pub-confirm> I have checked that the post is live on the correct '+esc(profileName())+' account.</label>'
-   +'<p class="danger-text" data-pub-error role="alert"></p><div class="actions"><button class="btn primary" type="button" data-pub-save>Record as Published</button><button class="btn" type="button" data-pub-cancel>Cancel</button></div>';
+  var targets=Array.from(new Set((post.networks||[]).filter(function(n){return CHANNELS.includes(n)})));
+  if(!targets.length){resolve(null);return}
+  var accounts=Array.isArray(activeProfile().accounts)?activeProfile().accounts:[];
+  var d=document.createElement('dialog');d.className='hq-review-dialog';d.setAttribute('aria-label','Record an external social post result');
+  d.innerHTML='<h2>Record an external result</h2><p><strong>'+esc(post.title)+'</strong> · '+esc(profileName())+'</p>'
+   +'<p class="muted">Only record what you personally checked in Buffer or on the real social platform. A share-sheet handoff alone is NOT confirmation. HQ has no live API connection.</p>'
+   +'<label class="field">Platform<select data-rec-platform>'+targets.map(function(n){return '<option value="'+esc(n)+'">'+esc(n)+'</option>'}).join('')+'</select></label>'
+   +'<label class="field">Actual result<select data-rec-stage><option value="scheduled" '+(preferred==='scheduled'?'selected':'')+'>Scheduled / queued</option><option value="published" '+(preferred==='published'?'selected':'')+'>Published / live</option></select></label>'
+   +'<label class="field">Actual account or @handle<input data-rec-account required maxlength="160" placeholder="@accountname or Page"></label>'
+   +'<p class="muted">Saved account references are notes, not authenticated destinations.</p>'
+   +'<label class="field" data-rec-time-wrap>Scheduled date and time (optional)<input data-rec-time type="datetime-local"></label>'
+   +'<label class="field" data-rec-link-wrap>Real public post URL<input data-rec-link type="url" placeholder="https://..."></label>'
+   +'<label class="setup-check"><input type="checkbox" data-rec-confirm> I checked this exact result on the correct external account. HQ did not publish or schedule it.</label>'
+   +'<p role="alert" class="danger-text" data-rec-error></p><div class="actions"><button class="btn primary" type="button" data-rec-save>Save manual record</button><button class="btn" type="button" data-rec-cancel>Cancel</button></div>';
   document.body.appendChild(d);
-  function done(v){if(d.open)d.close();d.remove();resolve(v)}
-  d.querySelector('[data-pub-cancel]').addEventListener('click',function(){done(null)});
-  d.addEventListener('cancel',function(e){e.preventDefault();done(null)});
-  d.querySelector('[data-pub-save]').addEventListener('click',function(){
-   var url=d.querySelector('[data-pub-url]').value.trim();
-   if(!url||!safeUrl(url)||!d.querySelector('[data-pub-confirm]').checked){d.querySelector('[data-pub-error]').textContent='Enter the real https:// public link and confirm it is live.';return}
-   done(url);
+  var platform=d.querySelector('[data-rec-platform]'),stage=d.querySelector('[data-rec-stage]'),account=d.querySelector('[data-rec-account]'),url=d.querySelector('[data-rec-link]'),due=d.querySelector('[data-rec-time]');
+  var datalist=document.createElement('datalist');datalist.id='hq-publishing-accounts-'+id().slice(0,10);account.setAttribute('list',datalist.id);d.appendChild(datalist);
+  function update(){
+   datalist.innerHTML=accounts.filter(function(a){return a.service===platform.value}).map(function(a){return '<option value="'+esc(a.handle)+'"></option>'}).join('');
+   var live=stage.value==='published';d.querySelector('[data-rec-link-wrap]').hidden=!live;d.querySelector('[data-rec-time-wrap]').hidden=live;
+   if(!live)url.value='';
+  }
+  function finish(r){if(d.open)d.close();d.remove();resolve(r)}
+  platform.addEventListener('change',update);stage.addEventListener('change',update);update();
+  d.querySelector('[data-rec-cancel]').addEventListener('click',function(){finish(null)});
+  d.addEventListener('cancel',function(e){e.preventDefault();finish(null)});
+  d.querySelector('[data-rec-save]').addEventListener('click',function(){
+   var handle=account.value.trim(),link=url.value.trim(),when=due.value.trim(),live=stage.value==='published';
+   var problem=!handle?'Enter the actual account you checked.':
+    live&&(!link||!safeUrl(link))?'Enter the actual HTTPS link to the live post.':
+    !live&&when&&!/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]$/.test(when)?'Check the scheduled date and time.':
+    !d.querySelector('[data-rec-confirm]').checked?'Tick the confirmation after checking the external account.':'';
+   if(problem){d.querySelector('[data-rec-error]').textContent=problem;return}
+   finish({platform:platform.value,stage:stage.value,account:handle,publicUrl:live?link:'',scheduledFor:live?'':when});
   });
   if(typeof d.showModal==='function')d.showModal();else d.setAttribute('open','');
+  platform.focus();
  });
 }
-async function recordPublished(post){
- if(post.reviewed!==true||!['Ready','Scheduled manually'].includes(post.status))return info('Verify and mark Ready before recording publication');
- var url=await requestPublishedUrl(post);
- if(!url)return;
- var proposed=Object.assign({},post,{status:'Published',publishedUrl:url});
- var errors=releaseChecks(proposed,true,true);
- if(errors.length)return info('Cannot record publication: '+errors[0]);
- try{await verifyPostImagesOnDevice([proposed])}catch(err){return info(err.message)}
- await changePosts([post],function(p){p.status='Published';p.publishedUrl=url;p.publishedExternallyAt=new Date().toISOString()},'Marked Published in HQ only. Nothing was sent from HQ.');
+async function recordChannelPublication(post,preferred){
+ if(!post||!inProfile(post)||post.reviewed!==true||!['Ready','Scheduled manually','Published'].includes(post.status))return info('Approve the post first');
+ if(!(post.networks||[]).some(function(n){return CHANNELS.includes(n)}))return info('Choose a target platform first');
+ var result=await requestManualPublicationRecord(post,preferred||'published');
+ if(!result)return;
+ if(!(post.networks||[]).includes(result.platform))return info('Choose an intended platform');
+ if((post.publicationReceipts||[]).length>=150)return info('The publication log is full');
+ var now=new Date().toISOString(),receipt={id:id(),source:'manual',revision:publishingReceiptRevision(post),platform:result.platform,stage:result.stage,account:result.account,publicUrl:result.publicUrl,scheduledFor:result.scheduledFor,recordedAt:now};
+ var candidate=Object.assign({},post,{publicationReceipts:(post.publicationReceipts||[]).concat([receipt])}),progress=manualPublishingProgress(candidate);
+ if(progress.allPublished){candidate.status='Published';candidate.publishedUrl=result.publicUrl||Object.values(progress.last).find(function(x){return x.stage==='published'})?.publicUrl||'';candidate.publishedExternallyAt=now}
+ else if(progress.allAccounted){candidate.status='Scheduled manually';candidate.scheduledExternallyConfirmed=true}
+ else if(post.status==='Ready')candidate.status='Ready';
+ var errors=releaseChecks(candidate,true,progress.allPublished);
+ if(errors.length)return info('Could not record: '+errors[0]);
+ try{await verifyPostImagesOnDevice([candidate])}catch(e){return info(e.message)}
+ await changePosts([post],function(p){
+  p.publicationReceipts=candidate.publicationReceipts;p.status=candidate.status;
+  if(candidate.status==='Published'){p.publishedUrl=candidate.publishedUrl;p.publishedExternallyAt=now}
+  if(candidate.status==='Scheduled manually')p.scheduledExternallyConfirmed=true;
+ },'Manual '+result.platform+' '+result.stage+' record saved. Buffer has not verified it.');
 }
+async function recordPublished(post){return recordChannelPublication(post,'published')}
 async function changeOneStatus(post,next){
  if(!POST_STATUSES.includes(next)||next===post.status)return;
  if(next==='Ready')return verifyRecords([post]);
  if(next==='Published')return recordPublished(post);
  if(post.status==='Published')return info('Use the full editor for already-published history');
- if(next==='Scheduled manually'){
-  if(post.reviewed!==true||post.status!=='Ready')return info('Verify and mark Ready before recording external scheduling');
-  if(!await confirmHQ('Have you already scheduled '+post.title+' on the correct '+profileName()+' social account? HQ cannot schedule it.','Confirm external scheduling'))return;
-  return changePosts([post],function(p){p.status='Scheduled manually';p.scheduledExternallyConfirmed=true},'External scheduling recorded in HQ');
- }
+ if(next==='Scheduled manually')return recordChannelPublication(post,'scheduled');
  if(!await confirmHQ('Set '+post.title+' to '+next+' and clear its local approval? This will not undo anything in Buffer.','Change HQ status'))return;
  return changePosts([post],function(p){p.status=next;p.reviewed=false;p.reviewedAt=''},'Local status updated to '+next);
 }
