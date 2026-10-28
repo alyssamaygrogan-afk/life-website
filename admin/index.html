@@ -310,6 +310,7 @@ function validateWorkspace(d){
    for(var m of d.media){
     if(!m||typeof m!=='object'||!isText(m.id,300)||!m.id||!isText(m.name,300)||!isText(m.type,80)||!['image/png','image/jpeg','image/webp'].includes(m.type)||!Number.isSafeInteger(m.size)||m.size<0||m.size>8000000)throw Error('Invalid media entry');
     if(m.altText!==undefined&&!isText(m.altText,2000))throw Error('Invalid image description');
+     if(m.sha256!==undefined&&(typeof m.sha256!=='string'||!/^[a-f0-9]{64}$/.test(m.sha256)))throw Error('Invalid image fingerprint');
    }
  }
  if(d.trash!==undefined){
@@ -1603,15 +1604,29 @@ async function addMediaFiles(files,attach){
  if(!list.length)return;
  if(!data||!key||pendingSaves)throw Error('Wait for the current save or unlock HQ first');
  if(list.length>20)throw Error('Upload 20 images at a time or fewer');
- if(attach&&draftMediaRefs.length+list.length>8)throw Error('A post supports up to 8 images');
- var oldMedia=data.media.slice(),oldRefs=draftMediaRefs.slice(),written=[],count=0;
+ if(attach&&draftMediaRefs.length+list.length>8)throw Error('One post supports up to eight attached images');
+ var oldMedia=data.media.slice(),oldRefs=draftMediaRefs.slice(),written=[],count=0,reused=0;
  var form=attach?q('#postform'):null,oldFormat=form&&form.elements.format?form.elements.format.value:null;
  try{
   for(var file of list){
+   if(!Number.isSafeInteger(file.size)||file.size<24||file.size>8000000)throw Error('Each image must be a valid file smaller than 8 MB');
+   var hash=await mediaFileHash(file);
+   var existing=profileRecords('media').find(function(m){return m.sha256===hash});
+   if(existing){
+    /* An old image may have its metadata but no encrypted file on this device. */
+    try{var present=await mediaGet(existing.id);if(!present||!present.size)existing=null}catch(err){existing=null}
+   }
+   if(existing){
+    reused++;
+    var oldRef='localmedia:'+existing.id;
+    if(attach&&!draftMediaRefs.includes(oldRef))draftMediaRefs.push(oldRef);
+    continue;
+   }
    var mediaId='upload-'+id();
    var verifiedType=await mediaPut(mediaId,file);
    written.push(mediaId);
-   data.media.push({id:mediaId,profileId:activeProfileId,name:String(file.name||'Image').slice(0,250),type:verifiedType,size:file.size,altText:'',createdAt:new Date().toISOString(),source:'upload'});
+   data.media.push({id:mediaId,profileId:activeProfileId,name:String(file.name||'Image').slice(0,250),
+    type:verifiedType,size:file.size,sha256:hash,altText:'',createdAt:new Date().toISOString(),source:'upload'});
    if(attach)draftMediaRefs.push('localmedia:'+mediaId);
    count++;
   }
@@ -1620,13 +1635,12 @@ async function addMediaFiles(files,attach){
    refreshMediaComposer();
    if(form)form.dataset.hasUnsavedChanges='yes';
   }
-  /* Image blobs and workspace metadata are separate stores; compensate on any failure. */
-  if(!await save(attach?{skipRender:true}:undefined))throw Error('Image metadata was not saved on this device');
-  info(count+' image'+(count===1?'':'s')+' saved');
+  if(!await save(attach?{skipRender:true}:undefined))throw Error('Encrypted image metadata could not be saved on this device');
+  info(count+' image'+(count===1?'':'s')+' saved'+(reused?'; '+reused+' duplicate'+(reused===1?'':'s')+' reused without re-uploading':''));
  }catch(err){
   data.media=oldMedia;draftMediaRefs=oldRefs;
   if(form&&oldFormat!==null&&form.elements.format)form.elements.format.value=oldFormat;
-  for(var mediaId of written){try{await mediaRemove(mediaId)}catch(cleanupErr){console.warn('Image upload cleanup failed',cleanupErr)}}
+  for(var writtenId of written){try{await mediaRemove(writtenId)}catch(cleanupErr){console.warn('Image upload cleanup failed',cleanupErr)}}
   if(attach)refreshMediaComposer();
   throw Error('Image upload was rolled back: '+err.message);
  }
