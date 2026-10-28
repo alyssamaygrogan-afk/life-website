@@ -1546,6 +1546,58 @@ function mediaLibrary(){
    +'<div class="actions"><button class="btn" data-edit-media-description="'+esc(m.id)+'">Edit description</button><button class="btn" data-use-media="'+esc(m.id)+'">New post</button><button class="btn" data-export-media="'+esc(m.id)+'">Save copy</button><button class="btn danger" data-trash-media="'+esc(m.id)+'" '+(count||usage.recoverable?'disabled title="Used by a saved or recoverable post"':'')+'>Bin</button></div></div>';
   }).join(''):'<p>No matching pictures. Try clearing the search or change the filter.</p>')+'</div></div>';
 }
+
+/* SHA-256 fingerprints are private metadata for files newly uploaded through HQ.
+   Older artwork has no fingerprint; no existing encrypted media is rewritten. */
+async function mediaFileHash(file){
+ var value=new Uint8Array(await crypto.subtle.digest('SHA-256',await file.arrayBuffer()));
+ return Array.from(value).map(function(n){return n.toString(16).padStart(2,'0')}).join('');
+}
+function mediaDescriptionDialog(entry){
+ return new Promise(function(resolve){
+  var dlg=document.createElement('dialog');dlg.className='hq-review-dialog';
+  dlg.setAttribute('aria-label','Edit image accessibility description');
+  dlg.innerHTML='<h3>Describe this image</h3><p class="muted">'+esc(entry.name)+'</p><p>This description is saved with the picture in '+esc(profileName())+'. Existing posts keep their individually approved descriptions; edit a post separately to update its wording.</p>'
+   +'<label class="field">Image description<textarea data-media-alt maxlength="2000" rows="4" placeholder="Describe what can be seen in the picture">'+esc(entry.altText||'')+'</textarea></label>'
+   +'<div class="actions"><button class="btn primary" type="button" data-media-alt-save>Save description</button><button class="btn" type="button" data-media-alt-cancel>Cancel</button></div>';
+  document.body.appendChild(dlg);
+  var field=dlg.querySelector('[data-media-alt]');
+  function finish(v){if(dlg.open)dlg.close();dlg.remove();resolve(v)}
+  dlg.querySelector('[data-media-alt-save]').addEventListener('click',function(){finish(field.value.trim())});
+  dlg.querySelector('[data-media-alt-cancel]').addEventListener('click',function(){finish(null)});
+  dlg.addEventListener('cancel',function(e){e.preventDefault();finish(null)});
+  if(typeof dlg.showModal==='function')dlg.showModal();else dlg.setAttribute('open','');
+  field.focus();
+ });
+}
+async function editMediaDescription(mediaId){
+ if(pendingSaves)throw Error('Finish saving before editing image descriptions');
+ var image=profileRecords('media').find(function(m){return m.id===mediaId});
+ if(!image)throw Error('Image is not in this profile');
+ var value=await mediaDescriptionDialog(image);
+ if(value===null||value===String(image.altText||''))return;
+ var previous=image.altText;
+ image.altText=value;
+ try{
+  validateWorkspace(data);
+  if(!await save({skipRender:true}))throw Error('Could not save the updated encrypted description');
+  render();info('Image description saved. Previously approved post wording was not changed.');
+ }catch(err){image.altText=previous;render();throw err}
+}
+q('#body').addEventListener('input',function(e){
+ if(e.target.id!=='hq-media-search')return;
+ mediaQuery=String(e.target.value||'').slice(0,250);
+ var cursor=e.target.selectionStart;
+ render();
+ var input=q('#hq-media-search');
+ if(input){input.focus({preventScroll:true});try{input.setSelectionRange(cursor,cursor)}catch(err){}}
+});
+q('#body').addEventListener('change',function(e){
+ if(e.target.id!=='hq-media-filter')return;
+ mediaFilter=e.target.value;
+ render();
+});
+
 async function addMediaFiles(files,attach){
  var list=Array.from(files||[]);
  if(!list.length)return;
@@ -1635,7 +1687,13 @@ q('#body').addEventListener('click',async function(e){
   if(b.dataset.action==='makebrandcard'){await makeBrandCard();return}
   if(b.dataset.detachMedia){draftMediaRefs=draftMediaRefs.filter(function(x){return x!==b.dataset.detachMedia});refreshMediaComposer();return}
   if(b.dataset.attachMedia){if(draftMediaRefs.length>=8)throw Error('Maximum 8 images in one post');var ref='localmedia:'+b.dataset.attachMedia;if(!draftMediaRefs.includes(ref))draftMediaRefs.push(ref);var f=q('#postform');if(f&&f.elements.format&&f.elements.format.value==='Text')f.elements.format.value=draftMediaRefs.length>1?'Carousel':'Image';refreshMediaComposer();return}
-  if(b.dataset.useMedia){editing=null;navigate('post');draftMediaRefs=['localmedia:'+b.dataset.useMedia];refreshMediaComposer();return}
+  if(b.dataset.openPostFromMedia){
+    var post=profileRecords('posts').find(function(p){return p.id===b.dataset.openPostFromMedia});
+    if(!post)throw Error('This post is not available in the selected profile');
+    editing=post.id;draftMediaRefs=postMediaRefs(post).slice();navigate('post');return;
+   }
+   if(b.dataset.editMediaDescription){await editMediaDescription(b.dataset.editMediaDescription);return}
+   if(b.dataset.useMedia){editing=null;navigate('post');draftMediaRefs=['localmedia:'+b.dataset.useMedia];refreshMediaComposer();return}
   if(b.dataset.exportMedia){await exportMedia(b.dataset.exportMedia);return}
   if(b.dataset.trashMedia){if(!await confirmHQ('Move this image to the recycle bin? Existing posts can continue to use it.','Move to bin'))return;moveToTrash('media',b.dataset.trashMedia);if(await save())navigate('media');return}
  }catch(err){alert('Media action failed: '+err.message)}
