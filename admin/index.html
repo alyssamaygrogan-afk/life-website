@@ -1342,22 +1342,39 @@ function mediaLibrary(){
   return '<div class="media-tile"><img data-hq-media="'+esc(m.id)+'" alt="'+esc(m.altText||m.name)+'"><small title="'+esc(m.name)+'">'+esc(m.name)+'</small><small>'+Math.max(1,Math.round((m.size||0)/1024))+' KB</small><div class="actions"><button class="btn" data-use-media="'+esc(m.id)+'">New post</button><button class="btn" data-export-media="'+esc(m.id)+'">Save copy</button><button class="btn danger" data-trash-media="'+esc(m.id)+'">Bin</button></div></div>';
  }).join(''):'<p>No uploaded images yet. Add some above, or import the weekly image package from Posts.</p>')+'</div></div>';
 }
+/* Upload is all-or-nothing for metadata and newly stored encrypted images. */
+var mediaUploadBusy=false;
 async function addMediaFiles(files,attach){
+ if(mediaUploadBusy||pendingSaves)throw Error('Another save is running; finish it before adding images');
  var list=Array.from(files||[]);
  if(!list.length)return;
  if(list.length>20)throw Error('Upload 20 images at a time or fewer');
  if(attach&&draftMediaRefs.length+list.length>8)throw Error('A post supports up to 8 images');
- var count=0;
- for(var file of list){
-  var mediaId='upload-'+id();
-  var verifiedType=await mediaPut(mediaId,file);
-  data.media.push({id:mediaId,profileId:activeProfileId,name:String(file.name||'Image').slice(0,250),type:verifiedType,size:file.size,altText:'',createdAt:new Date().toISOString(),source:'upload'});
-  if(attach)draftMediaRefs.push('localmedia:'+mediaId);
-  count++;
- }
- if(attach){var composer=q('#postform');if(composer&&composer.elements.format&&composer.elements.format.value==='Text')composer.elements.format.value=draftMediaRefs.length>1?'Carousel':'Image';refreshMediaComposer()}
- // Only the media metadata is in workspace JSON; binary images stay encrypted in IndexedDB.
- if(!await save(attach?{skipRender:true}:undefined))throw Error('Image metadata could not be saved on this device');
+ mediaUploadBusy=true;
+ var originalMedia=(data.media||[]).slice(),originalRefs=draftMediaRefs.slice(),written=[],count=0;
+ try{
+  for(var file of list){
+   var mediaId='upload-'+id(),verifiedType=await mediaPut(mediaId,file);
+   written.push(mediaId);
+   data.media.push({id:mediaId,profileId:activeProfileId,name:String(file.name||'Image').slice(0,250),type:verifiedType,size:file.size,altText:'',createdAt:new Date().toISOString(),source:'upload'});
+   if(attach)draftMediaRefs.push('localmedia:'+mediaId);
+   count++;
+  }
+  // Binary image records live in encrypted IndexedDB; workspace metadata also
+  // must be saved before reporting upload success.
+  if(!await save({skipRender:true}))throw Error('Encrypted image metadata could not be saved');
+ }catch(err){
+  data.media=originalMedia;draftMediaRefs=originalRefs;
+  for(var mediaId of written){try{await mediaRemove(mediaId)}catch(cleanupErr){console.warn('Could not remove temporary upload',cleanupErr)}}
+  if(attach)refreshMediaComposer();else render();
+  throw Error('No new images were added: '+err.message);
+ }finally{mediaUploadBusy=false}
+ if(attach){
+  var composer=q('#postform');
+  if(composer&&composer.elements.format&&composer.elements.format.value==='Text')
+   composer.elements.format.value=draftMediaRefs.length>1?'Carousel':'Image';
+  refreshMediaComposer();
+ }else render();
  info(count+' image'+(count===1?'':'s')+' saved');
 }
 function refreshMediaComposer(){
