@@ -1284,7 +1284,7 @@ async function importWeekPackage(fileList){
   if(!await confirmHQ('Import seven posts dated '+expected[0]+' to '+expected[6]+'? '+oldDrafts.length+' existing unapproved weekly drafts will go to the Recycle Bin. Other drafts, approved posts and campaigns stay unchanged; encrypted recovery is saved first. Nothing is published.','Import seven drafts'))return false;
  // Automatic file downloads open a JSON preview in iPhone in-app browsers.
  // Use an encrypted IndexedDB recovery point instead of triggering a download.
- try{await savePreImportRecovery()}
+ try{await savePreImportRecovery({weekStart:weekStart,replacedPostIds:oldDrafts.map(function(p){return p.id}),importedPostIds:replacements.map(function(p){return p.id})})}
  catch(err){throw Error('For safety, the import did not start because an encrypted local recovery copy could not be saved: '+err.message+'. Try downloading a complete backup from Backup first.')}
  var originalPosts=data.posts.slice(),originalMedia=(data.media||[]).slice(),originalTrash=(data.trash||[]).slice(),written=[];
  var label='Importing L-I-F-E images';
@@ -1512,32 +1512,65 @@ function recoveryDb(){
   request.onerror=function(){reject(request.error||Error('Local recovery storage unavailable'))};
  });
 }
-async function recoveryRecord(operation,value){
+async function recoveryRecord(operation,value,lookupId){
  var db=await recoveryDb();
  try{
   return await new Promise(function(resolve,reject){
-   var result,settled=false,tx=db.transaction('snapshots',operation==='get'?'readonly':'readwrite');
-   var store=tx.objectStore('snapshots');
-   var req=operation==='get'?store.get('before-week-import'):operation==='delete'?store.delete('before-week-import'):store.put(value);
+   var result,settled=false,readOnly=operation==='get'||operation==='list';
+   var tx=db.transaction('snapshots',readOnly?'readonly':'readwrite'),store=tx.objectStore('snapshots');
+   var target=lookupId||'before-week-import';
+   var req=operation==='get'?store.get(target):
+    operation==='list'?store.getAll():
+    operation==='delete'?store.delete(target):store.put(value);
    req.onsuccess=function(){result=req.result};
    function fail(err){if(settled)return;settled=true;reject(err)}
    tx.oncomplete=function(){if(settled)return;settled=true;resolve(result)};
    tx.onerror=function(){fail(tx.error||Error('Recovery storage failed'))};
-   tx.onabort=function(){fail(tx.error||Error('Insufficient device storage for recovery copy'))};
+   tx.onabort=function(){fail(tx.error||Error('Insufficient device storage for the encrypted recovery copy'))};
   });
  }finally{db.close()}
 }
-async function savePreImportRecovery(){
+async function savePreImportRecovery(details){
  if(!saved||!key)throw Error('Unlock HQ before importing');
  if(pendingSaves)throw Error('Your current changes must finish saving first');
+ var opts=details||{},date=new Date().toISOString();
  var before={
-  id:'before-week-import',
-  createdAt:new Date().toISOString(),
+  id:'before-week-import-'+Date.now()+'-'+id().slice(0,8),
+  createdAt:date,
+  kind:opts.weekStart?'weekly-package':'caption-update',
+  weekStart:opts.weekStart||null,
+  profileId:activeProfileId,
+  replacedPostIds:Array.isArray(opts.replacedPostIds)?opts.replacedPostIds.slice():[],
+  importedPostIds:Array.isArray(opts.importedPostIds)?opts.importedPostIds.slice():[],
   workspace:JSON.parse(JSON.stringify(saved)),
   media:await allEncryptedMedia()
  };
  await recoveryRecord('put',before);
+ /* Keep up to three dated encrypted snapshots; old pre-update recovery remains readable. */
+ try{
+  var snapshots=(await recoveryRecord('list')).filter(function(r){return /^before-week-import-\d/.test(r.id||'')})
+   .sort(function(a,b){return String(b.createdAt).localeCompare(String(a.createdAt))});
+  for(var old of snapshots.slice(3))await recoveryRecord('delete',null,old.id);
+ }catch(err){console.warn('Old recovery copies could not be trimmed',err)}
  return before.createdAt;
+}
+function chooseWeeklyRecovery(snapshots){
+ return new Promise(function(resolve){
+  var dlg=document.createElement('dialog');dlg.className='hq-review-dialog';
+  dlg.setAttribute('aria-label','Choose an encrypted recovery point');
+  dlg.innerHTML='<h3>Restore earlier weekly drafts</h3><p>Choose a saved recovery point. For new weekly imports, only the posts replaced by that import will be restored. Other profiles and later posts remain untouched.</p>'
+  +'<label class="field">Recovery point<select data-recovery-select>'+snapshots.map(function(r){
+   return '<option value="'+esc(r.id)+'">'+esc(new Date(r.createdAt).toLocaleString('en-GB'))+' · '+esc(r.weekStart||'Older full-workspace recovery')+'</option>';
+  }).join('')+'</select></label>'
+  +'<p class="muted">Imported pictures are retained in the media library for safety. For older recovery copies, restoring may replace the entire workspace — a separate warning will appear.</p>'
+  +'<div class="actions"><button class="btn primary" type="button" data-recovery-choose>Continue</button><button class="btn" type="button" data-recovery-cancel>Cancel</button></div>';
+  document.body.appendChild(dlg);
+  function done(v){if(dlg.open)dlg.close();dlg.remove();resolve(v)}
+  dlg.querySelector('[data-recovery-choose]').addEventListener('click',function(){done(dlg.querySelector('[data-recovery-select]').value)});
+  dlg.querySelector('[data-recovery-cancel]').addEventListener('click',function(){done(null)});
+  dlg.addEventListener('cancel',function(e){e.preventDefault();done(null)});
+  if(typeof dlg.showModal==='function')dlg.showModal();else dlg.setAttribute('open','');
+ });
 }
 async function recoverBeforeWeekImport(){
  if(!key||!data)throw Error('Unlock this workspace before restoring');
