@@ -469,7 +469,7 @@ function postForm(){
  +'<div class="actions full"><button class="btn primary">Save post</button><button class="btn" type="button" data-action="posts">Cancel</button>'+(editing?'<button class="btn danger" type="button" data-action="deletepost">Move to bin</button>':'')+'</div></form></div>';
 }
 
-function calendar(){var y=Number(month.slice(0,4)),m=Number(month.slice(5)),first=new Date(Date.UTC(y,m-1,1)),n=new Date(Date.UTC(y,m,0)).getUTCDate(),pad=(first.getUTCDay()+6)%7;var html='<div class="actions"><button class="btn" data-action="previous">←</button><h3>'+first.toLocaleDateString('en-GB',{month:'long',year:'numeric',timeZone:'UTC'})+'</h3><button class="btn" data-action="next">→</button></div><div class="cal">'+['M','T','W','T','F','S','S'].map(function(s){return '<div class="day">'+s+'</div>'}).join('');for(var i=0;i<Math.ceil((pad+n)/7)*7;i++){var day=i-pad+1,date=day>0&&day<=n?month+'-'+String(day).padStart(2,'0'):'';html+='<div class="day">'+(date?'<strong>'+day+'</strong>'+data.posts.filter(function(p){return p.date===date}).slice(0,3).map(function(p){return '<button class="calendar-event" data-edit="'+esc(p.id)+'" aria-label="Edit '+esc(p.title)+' on '+esc(date)+'">'+esc(p.title)+'</button>'}).join(''):'')+'</div>'}return html+'</div>'}
+function calendar(){var y=Number(month.slice(0,4)),m=Number(month.slice(5)),first=new Date(Date.UTC(y,m-1,1)),n=new Date(Date.UTC(y,m,0)).getUTCDate(),pad=(first.getUTCDay()+6)%7;var html='<div class="actions"><button class="btn" data-action="previous">←</button><h3>'+first.toLocaleDateString('en-GB',{month:'long',year:'numeric',timeZone:'UTC'})+'</h3><button class="btn" data-action="next">→</button></div><div class="cal">'+['M','T','W','T','F','S','S'].map(function(s){return '<div class="day">'+s+'</div>'}).join('');for(var i=0;i<Math.ceil((pad+n)/7)*7;i++){var day=i-pad+1,date=day>0&&day<=n?month+'-'+String(day).padStart(2,'0'):'';html+='<div class="day">'+(date?'<strong>'+day+'</strong>'+profileRecords('posts').filter(function(p){return p.date===date}).slice(0,3).map(function(p){return '<button class="calendar-event" data-edit="'+esc(p.id)+'" aria-label="Edit '+esc(p.title)+' on '+esc(date)+'">'+esc(p.title)+'</button>'}).join(''):'')+'</div>'}return html+'</div>'}
 function contacts(){return '<div class="actions"><button class="btn primary" data-action="newcontact">Add contact</button></div><div class="panel">'+(data.contacts.length?data.contacts.map(function(c){return '<div class="row"><h3>'+esc(c.name)+'</h3><span class="tag">'+esc(c.status)+'</span> '+esc(c.category)+'<p>'+esc(c.notes)+'</p><button class="btn" data-editcontact="'+esc(c.id)+'">Edit</button></div>'}).join(''):'No contacts yet. Add local papers, radio, councillors, MPs and St John contacts.')+'</div>'}
 function contactForm(){var c=data.contacts.find(function(x){return x.id===contactEditing})||{name:'',category:'Local media',status:'To contact',notes:''};return '<div class="panel"><h3>Contact</h3><form id="contactform"><label class="field">Name<input name="name" required value="'+esc(c.name)+'"></label><label class="field">Category<input name="category" value="'+esc(c.category)+'"></label><label class="field">Status<select name="status">'+['To contact','Contacted','Awaiting reply','Confirmed','Declined'].map(function(s){return '<option '+(s===c.status?'selected':'')+'>'+s+'</option>'}).join('')+'</select></label><label class="field">Notes<textarea name="notes">'+esc(c.notes)+'</textarea></label><div class="actions"><button class="btn primary">Save contact</button><button class="btn" type="button" data-action="contacts">Cancel</button>'+(contactEditing?'<button class="btn danger" type="button" data-action="deletecontact">Move to bin</button>':'')+'</div></form></div>'}
 
@@ -653,7 +653,7 @@ function adForm(){
  +'<p class="form-error hidden full" id="aderror" role="alert"></p><div class="actions full"><button class="btn primary">Save plan</button><button class="btn" type="button" data-action="campaigns">Cancel</button>'+(adEditing?'<button class="btn danger" type="button" data-action="deletead">Move to bin</button>':'')+'</div></form></div>';
 }
 function reports(){
- var posted=data.posts.filter(function(p){return p.status==='Published'});
+ var posted=profileRecords('posts').filter(function(p){return p.status==='Published'});
  var views=posted.reduce(function(n,p){return n+Number(p.views||0)},0);
  var clicks=posted.reduce(function(n,p){return n+Number(p.clicks||0)},0);
  var interactions=posted.reduce(function(n,p){return n+Number(p.interactions||0)},0);
@@ -673,11 +673,11 @@ function exportCsv(kind){
  if(kind==='posts'){
   filename='LIFE-Social-Media-Posts.csv';
   rows=[['Date','UK time','Title','Topic','Platforms','Status','Format','Caption','Media note','Alt text','CTA URL','Published URL','Manual views','Manual clicks','Manual interactions']];
-  data.posts.forEach(function(p){rows.push([p.date,p.time,p.title,p.topic,(p.networks||[]).join('; '),p.status,p.format,p.caption,p.assetRef,p.altText,p.ctaUrl,p.publishedUrl,p.views,p.clicks,p.interactions])});
+  profileRecords('posts').forEach(function(p){rows.push([p.date,p.time,p.title,p.topic,(p.networks||[]).join('; '),p.status,p.format,p.caption,p.assetRef,p.altText,p.ctaUrl,p.publishedUrl,p.views,p.clicks,p.interactions])});
  }else{
   filename='LIFE-Advertising-Plans.csv';
   rows=[['Campaign','Platform','Goal','Start','End','Proposed budget GBP','Reported spend GBP','Manual status','Notes']];
-  (data.adPlans||[]).forEach(function(p){rows.push([p.name,p.platform,p.goal,p.startDate,p.endDate,p.budget,p.spent,p.status,p.notes])});
+  profileRecords('adPlans').forEach(function(p){rows.push([p.name,p.platform,p.goal,p.startDate,p.endDate,p.budget,p.spent,p.status,p.notes])});
  }
  var body='\uFEFF'+rows.map(function(row){return row.map(csvCell).join(',')}).join('\r\n');
  var url=URL.createObjectURL(new Blob([body],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');
@@ -707,7 +707,7 @@ function planningMonday(){
 }
 function isMondayUK(){return new Date(dateUK()+'T12:00:00Z').getUTCDay()===1}
 async function prepareWeeklyDrafts(automatic){
- if(!data)return;
+ if(!data||activeProfileId!=='life')return;
  var monday=planningMonday();
  if(automatic&&data.weeklyLastAuto===monday)return;
  var themes=[
@@ -732,7 +732,7 @@ async function prepareWeeklyDrafts(automatic){
   }else if(date>'2026-12-03'&&date<'2027-01-30'){
    caption+=' If the venue and ticket options have been approved, add only the confirmed details and booking link.';
   }
-  var newDraft={id:id(),title:title,date:date,time:'12:00',status:'Draft',caption:caption,weeklyKey:weeklyKey};
+  var newDraft={id:id(),profileId:'life',title:title,date:date,time:'12:00',status:'Draft',caption:caption,weeklyKey:weeklyKey};
   var card=typeof lifeSevenImageCopy!=='undefined'&&lifeSevenImageCopy.find(function(row){return row[0]===date});
   if(card){
    var day=Number(date.slice(-2)),days=day>=26?122-day:91-day;
@@ -749,12 +749,12 @@ async function prepareWeeklyDrafts(automatic){
  }
  if(!automatic)info(count?count+' weekly drafts prepared — review in Posts':'This week’s drafts are already prepared');
 }
-function prompts(){var count=0;for(var day=new Date('2026-10-22T12:00:00Z');day<=new Date('2027-01-30T12:00:00Z');day.setUTCDate(day.getUTCDate()+1)){var date=day.toISOString().slice(0,10),remaining=Math.round((Date.parse('2027-01-30T12:00:00Z')-day.getTime())/86400000);if(data.posts.some(function(p){return p.date===date&&p.title.indexOf('Countdown')===0}))continue;data.posts.push({id:id(),title:'Countdown '+remaining+' days',date:date,time:'12:00',status:'Draft',caption:remaining+' days until L-I-F-E launches in Milton Keynes. Three sisters. One dream. A future for everyone. www.lifeinfullecosystem.org'});count++}return count}
+function prompts(){if(activeProfileId!=='life')return 0;var count=0;for(var day=new Date('2026-10-22T12:00:00Z');day<=new Date('2027-01-30T12:00:00Z');day.setUTCDate(day.getUTCDate()+1)){var date=day.toISOString().slice(0,10),remaining=Math.round((Date.parse('2027-01-30T12:00:00Z')-day.getTime())/86400000);if(data.posts.some(function(p){return p.date===date&&p.title.indexOf('Countdown')===0}))continue;data.posts.push({id:id(),profileId:'life',title:'Countdown '+remaining+' days',date:date,time:'12:00',status:'Draft',caption:remaining+' days until L-I-F-E launches in Milton Keynes. Three sisters. One dream. A future for everyone. www.lifeinfullecosystem.org'});count++}return count}
 
 /* Transfer-ready share sheet preview. Buffer API is NOT connected on this version. */
 async function handoffToBuffer(postId){
  if(!data||!key)throw Error('Log in first');
- var post=data.posts.find(function(x){return x.id===postId});
+ var post=data.posts.find(function(x){return x.id===postId&&inProfile(x)});
  if(!post)throw Error('Post not found');
  if(post.status!=='Ready'||post.reviewed!==true||!post.reviewedAt)throw Error('Review the post and save it as Ready before sharing');
  var issues=releaseChecks(post,true,false);
@@ -1149,6 +1149,7 @@ function showMediaPreviews(){
  });
 }
 async function importWeekPackage(fileList){
+ if(activeProfileId!=='life')throw Error('L-I-F-E launch packs can only be imported into the L-I-F-E profile');
  if(!data||!key)throw Error('Unlock your L-I-F-E HQ workspace first');
  if(pendingSaves)throw Error('Finish saving your current work before importing');
  var files=Array.from(fileList||[]),manifests=files.filter(function(f){return /^LIFE-HQ-week-\d{4}-\d{2}-\d{2}\.json$/.test(f.name)});
@@ -1173,9 +1174,9 @@ async function importWeekPackage(fileList){
    usedNames.add(p.assetRef);
    var newMediaId='weekly-'+date+'-'+id().slice(0,8);
   staged.push({id:newMediaId,file:mediaFiles[p.assetRef],name:p.assetRef,altText:p.altText,date:date});
-  replacements.push({id:'life-package-'+date+'-'+id().slice(0,8),weeklyKey:p.weeklyKey,title:p.title,date:p.date,time:'',status:'Draft',caption:p.caption,topic:p.topic||'General',format:'Image',networks:['Facebook','Instagram','TikTok','LinkedIn'],assetRef:'localmedia:'+newMediaId,mediaRefs:['localmedia:'+newMediaId],altText:p.altText,platformCaptions:p.platformCaptions,reviewed:false,reviewedAt:'',notes:'Weekly image package — approval needed'});
+  replacements.push({profileId:'life',id:'life-package-'+date+'-'+id().slice(0,8),weeklyKey:p.weeklyKey,title:p.title,date:p.date,time:'',status:'Draft',caption:p.caption,topic:p.topic||'General',format:'Image',networks:['Facebook','Instagram','TikTok','LinkedIn'],assetRef:'localmedia:'+newMediaId,mediaRefs:['localmedia:'+newMediaId],altText:p.altText,platformCaptions:p.platformCaptions,reviewed:false,reviewedAt:'',notes:'Weekly image package — approval needed'});
  }
-  var oldDrafts=data.posts.filter(function(p){return p.status==='Draft'&&expected.includes(p.date)&&p.weeklyKey==='LIFE-WEEK-'+p.date});
+  var oldDrafts=profileRecords('posts').filter(function(p){return p.status==='Draft'&&expected.includes(p.date)&&p.weeklyKey==='LIFE-WEEK-'+p.date});
   if(!await confirmHQ('Import seven posts dated '+expected[0]+' to '+expected[6]+'? '+oldDrafts.length+' existing unapproved weekly drafts will go to the Recycle Bin. Other drafts, approved posts and campaigns stay unchanged; encrypted recovery is saved first. Nothing is published.','Import seven drafts'))return;
  // Automatic file downloads open a JSON preview in iPhone in-app browsers.
  // Use an encrypted IndexedDB recovery point instead of triggering a download.
@@ -1189,7 +1190,7 @@ async function importWeekPackage(fileList){
    info(label);
    var asset=staged[j],type=await mediaPut(asset.id,asset.file);
    written.push(asset.id);
-   data.media.push({id:asset.id,name:asset.name,type:type,size:asset.file.size,altText:asset.altText,createdAt:new Date().toISOString(),source:'weekly-import'});
+   data.media.push({id:asset.id,profileId:'life',name:asset.name,type:type,size:asset.file.size,altText:asset.altText,createdAt:new Date().toISOString(),source:'weekly-import'});
   }
   oldDrafts.forEach(function(p){moveToTrash('post',p.id)});
   data.posts=data.posts.concat(replacements);
@@ -1212,7 +1213,7 @@ q('#body').addEventListener('change',async function(e){if(e.target.id!=='backupf
 
 function mediaComposer(){
  var attached=(draftMediaRefs||[]).map(function(ref){return '<figure><img data-hq-media="'+esc(ref.slice(11))+'" alt="Attached image preview"><button class="btn" type="button" data-detach-media="'+esc(ref)+'">Remove</button></figure>'}).join('');
- var available=(data.media||[]).filter(function(m){return !draftMediaRefs.includes('localmedia:'+m.id)}).slice(-20).reverse().map(function(m){
+ var available=profileRecords('media').filter(function(m){return !draftMediaRefs.includes('localmedia:'+m.id)}).slice(-20).reverse().map(function(m){
   return '<div class="media-tile"><img data-hq-media="'+esc(m.id)+'" alt="'+esc(m.altText||m.name)+'"><small>'+esc(m.name)+'</small><button type="button" class="btn" data-attach-media="'+esc(m.id)+'">Attach</button></div>';
  }).join('');
  return '<div class="full panel" style="background:#fafbff;margin:8px 0"><h3>Images and artwork</h3><p class="muted">Upload images directly, reuse existing L-I-F-E artwork and attach up to 8 images to this post. Saved privately, encrypted on this device.</p>'
@@ -1223,7 +1224,7 @@ function mediaComposer(){
  +'<button class="btn" type="button" data-action="makebrandcard">Generate branded 1080 × 1080 image</button></div>';
 }
 function mediaLibrary(){
- var items=(data.media||[]).slice().sort(function(a,b){return (b.createdAt||'').localeCompare(a.createdAt||'')});
+ var items=profileRecords('media').slice().sort(function(a,b){return (b.createdAt||'').localeCompare(a.createdAt||'')});
  return '<div class="panel hero"><h3>Media library</h3><p>Upload, preview and reuse your own L-I-F-E images. Stored privately and encrypted on this device. File sizes up to 8 MB each.</p><strong>'+items.length+' assets</strong></div>'
  +'<div class="panel upload-zone" id="media-drop"><h3>▧ Add your images</h3><p>Choose PNG, JPEG or WebP files, or drag and drop them here.</p><label class="btn primary">Upload images<input id="library-image-upload" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden></label></div>'
  +'<div class="panel"><h3>My images</h3><div class="tile-grid">'+(items.length?items.map(function(m){
@@ -1239,7 +1240,7 @@ async function addMediaFiles(files,attach){
  for(var file of list){
   var mediaId='upload-'+id();
   var verifiedType=await mediaPut(mediaId,file);
-  data.media.push({id:mediaId,name:String(file.name||'Image').slice(0,250),type:verifiedType,size:file.size,altText:'',createdAt:new Date().toISOString(),source:'upload'});
+  data.media.push({id:mediaId,profileId:activeProfileId,name:String(file.name||'Image').slice(0,250),type:verifiedType,size:file.size,altText:'',createdAt:new Date().toISOString(),source:'upload'});
   if(attach)draftMediaRefs.push('localmedia:'+mediaId);
   count++;
  }
@@ -1492,7 +1493,7 @@ q('#body').addEventListener('click',async function(e){
  if(caption.length>10000)return info('Caption is too long');
  var title=caption.split('\n')[0].trim().slice(0,100)||'New L-I-F-E draft';
  // Users control release: pasted text is always a private draft, never approved.
- var p={id:id(),title:title,date:'',time:'',status:'Draft',caption:caption,topic:'General',format:'Text',networks:['Facebook','Instagram','TikTok','LinkedIn'],reviewed:false,reviewedAt:'',createdAt:new Date().toISOString()};
+ var p={id:id(),profileId:activeProfileId,title:title,date:'',time:'',status:'Draft',caption:caption,topic:'General',format:'Text',networks:['Facebook','Instagram','TikTok','LinkedIn'],reviewed:false,reviewedAt:'',createdAt:new Date().toISOString()};
  data.posts.push(p);
  if(await save()){editing=p.id;navigate('post');info('New private draft added — add images and review before scheduling')}
 });
@@ -1509,7 +1510,7 @@ function moveToTrash(kind,ref){
  selectedPostIds.delete(ref);
 }
 function trash(){
- var items=(data.trash||[]).slice().reverse();
+ var items=(data.trash||[]).filter(function(x){return inProfile(x.record)}).slice().reverse();
  return '<div class="panel hero"><h3>Recycle bin</h3><p>Items are held in your encrypted device workspace until you permanently delete them. External social media posts are NOT removed.</p><strong>'+items.length+' items</strong></div>'
  +'<div class="panel"><div class="actions"><button type="button" class="btn" data-action="openposts">Return to Posts</button><button type="button" class="btn danger" data-action="emptytrash" '+(!items.length?'disabled':'')+'>Empty bin permanently</button></div>'
  +(items.length?items.map(function(item){
@@ -1537,7 +1538,7 @@ q('#body').addEventListener('click',async function(e){
  try{
   if(b.dataset.statusTab){postFilter=b.dataset.statusTab;selectedPostIds.clear();render();return}
   if(b.dataset.duplicate){var original=data.posts.find(function(p){return p.id===b.dataset.duplicate});if(!original)return;
-   var copy=Object.assign({},structuredClone(original),{id:id(),title:'Copy — '+original.title,status:'Draft',reviewed:false,reviewedAt:'',publishedUrl:'',date:''});
+   var copy=Object.assign({},structuredClone(original),{id:id(),profileId:activeProfileId,title:'Copy — '+original.title,status:'Draft',reviewed:false,reviewedAt:'',publishedUrl:'',date:''});
    delete copy.weeklyKey;data.posts.push(copy);if(await save()){editing=copy.id;navigate('post')}return}
   if(b.dataset.trashPost){if(!await confirmHQ('Move this record to the recycling bin? Published content will remain live on external platforms.','Move to bin'))return;moveToTrash('post',b.dataset.trashPost);if(await save())navigate('posts');return}
   if(b.dataset.restoreTrash){await restoreFromBin(b.dataset.restoreTrash);return}
@@ -1555,8 +1556,8 @@ q('#body').addEventListener('change',function(e){
 
 /* Shortcuts are local workflow records, not external Buffer publishing. */
 var shortcutBusy=false;
-function selectedRecords(){return Array.from(selectedPostIds).map(function(pid){return data.posts.find(function(p){return p.id===pid})}).filter(Boolean)}
-function visibleRecords(){var query=postQuery.trim().toLowerCase();return data.posts.filter(function(p){return (postFilter==='all'||p.status===postFilter)&&(!query||[p.title,p.caption,p.date,(p.networks||[]).join(' '),p.topic].join(' ').toLowerCase().includes(query))})}
+function selectedRecords(){return Array.from(selectedPostIds).map(function(pid){return data.posts.find(function(p){return p.id===pid&&inProfile(p)})}).filter(Boolean)}
+function visibleRecords(){var query=postQuery.trim().toLowerCase();return profileRecords('posts').filter(function(p){return (postFilter==='all'||p.status===postFilter)&&(!query||[p.title,p.caption,p.date,(p.networks||[]).join(' '),p.topic].join(' ').toLowerCase().includes(query))})}
 function updateSelectedLabel(){var label=q('#post-selected-count');if(label)label.textContent=selectedPostIds.size+' selected';var box=q('#select-visible-posts'),rows=visibleRecords();if(box){box.checked=rows.length>0&&rows.every(function(p){return selectedPostIds.has(p.id)});box.indeterminate=!box.checked&&rows.some(function(p){return selectedPostIds.has(p.id)})}}
 function readyIssues(post){
  var issues=releaseChecks(Object.assign({},post,{status:'Ready'}),true,false);
