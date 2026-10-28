@@ -417,13 +417,41 @@ var POST_STATUSES=['Draft','Needs review','Ready','Scheduled manually','Publishe
 var postFilter='all',postQuery='';
 function safeUrl(value){if(!value)return true;try{var u=new URL(value);return u.protocol==='https:'}catch(e){return false}}
 function isPublicStatus(status){return ['Ready','Scheduled manually','Published'].includes(status)}
+function postMediaRefs(p){
+ return Array.isArray(p.mediaRefs)&&p.mediaRefs.length?p.mediaRefs:
+  (String(p.assetRef||'').startsWith('localmedia:')?[p.assetRef]:[]);
+}
+async function verifyPostImagesOnDevice(posts){
+ var checked=new Set();
+ for(var post of posts){
+  if(!isPublicStatus(post.status)||!['Image','Carousel'].includes(post.format))continue;
+  for(var ref of postMediaRefs(post)){
+   if(checked.has(ref))continue;checked.add(ref);
+   var item=(data.media||[]).find(function(m){return m.id===ref.slice(11)});
+   if(!item||profileOf(item)!==profileOf(post))throw Error('Attached artwork is not in this profile’s media library.');
+   try{var blob=await mediaGet(item.id);if(!blob||!blob.size)throw Error('Empty image')}
+   catch(err){throw Error('The image "'+item.name+'" is not accessible on this device. Please reattach or re-import it.')}
+  }
+ }
+}
 function releaseChecks(p,reviewed,postedExternally){
  var problems=[],tag=p.topic||'General';
  if(isPublicStatus(p.status)&&!reviewed)problems.push('Confirm that you reviewed this version of the post before marking it ready.');
  if(p.ctaUrl&&!safeUrl(p.ctaUrl))problems.push('The call-to-action link must be a valid https:// link.');
  if(p.publishedUrl&&!safeUrl(p.publishedUrl))problems.push('The published post link must be a valid https:// link.');
- if(isPublicStatus(p.status)&&(p.format==='Image'||p.format==='Carousel')&&!String(p.altText||'').trim())problems.push('Add image alt text before marking visual posts ready.');
+ if(isPublicStatus(p.status)&&(p.format==='Image'||p.format==='Carousel')){
+  if(!String(p.altText||'').trim())problems.push('Add image alt text before marking visual posts ready.');
+  var refs=postMediaRefs(p);
+  if(!refs.length)problems.push('Attach saved artwork before approving or publishing an image post.');
+  if(p.format==='Carousel'&&refs.length<2)problems.push('A carousel needs at least two attached images.');
+  for(var ref of refs){
+   if(typeof ref!=='string'||!ref.startsWith('localmedia:')){problems.push('Choose artwork saved in HQ rather than an external filename.');continue}
+   var item=(data.media||[]).find(function(m){return m.id===ref.slice(11)});
+   if(!item||profileOf(item)!==profileOf(p))problems.push('An attached image is missing or belongs to another profile.');
+  }
+ }
  if(p.status==='Published'&&!postedExternally)problems.push('Only mark Published after confirming you posted it on the external platform.');
+ if(p.status==='Published'&&!p.publishedUrl)problems.push('Enter the public HTTPS post link before recording Published.');
  if(profileOf(p)==='life'&&isPublicStatus(p.status)&&tag==='Venue / tickets'){
   var details=data.launchChecks||{};
   if(dateUK()<'2026-12-03')problems.push('Venue/ticket posts cannot be marked ready before 3 December 2026.');
@@ -969,9 +997,11 @@ q('#body').addEventListener('submit',async function(e){
     return formProblem('#postformerror','This post changed since it was last approved. Untick then tick the review confirmation again before saving it as approved.');
    var errors=releaseChecks(p,f.has('reviewed'),f.has('postedExternally'));
    if(errors.length)return formProblem('#postformerror',errors.join(' '));
-   data.posts=data.posts.filter(function(z){return z.id!==p.id});data.posts.push(p);
+   if(isPublicStatus(p.status))await verifyPostImagesOnDevice([p]);
+   var previousPosts=data.posts;
+   data.posts=previousPosts.filter(function(z){return z.id!==p.id}).concat([p]);
    if(await save({skipRender:true})){editing=null;navigate('posts');info(p.reviewed?'Review saved successfully; post is '+p.status:'Post saved as '+p.status)}
-   else formProblem('#postformerror','Saving failed in this browser. Keep this tab open; check device storage and try again. Your previous encrypted copy has not been replaced.');
+   else{data.posts=previousPosts;formProblem('#postformerror','Saving failed. The previous saved post is unchanged; keep the editor open and try again.');}
   }catch(err){formProblem('#postformerror','Could not save this post: '+err.message)}
  }else if(form.id==='contactform'){
   var c={id:contactEditing||id(),name:String(f.get('name')),category:String(f.get('category')),status:String(f.get('status')),notes:String(f.get('notes'))};
@@ -1688,6 +1718,7 @@ async function verifyRecords(posts){
  var problems=[];posts.forEach(function(p){readyIssues(p).forEach(function(x){problems.push(p.title+': '+x)})});
  if(problems.length){alert('These posts need changes before approval:\n\n'+problems.slice(0,12).join('\n'));return}
  if(!await reviewDialog(posts))return;
+ try{await verifyPostImagesOnDevice(posts.map(function(p){return Object.assign({},p,{status:'Ready'})}))}catch(err){info(err.message);return}
  var reviewedAt=new Date().toISOString();
  await changePosts(posts,function(p){p.status='Ready';p.reviewed=true;p.reviewedAt=reviewedAt},posts.length+' reviewed post(s) marked Ready (not published)');
 }
@@ -1713,8 +1744,10 @@ async function recordPublished(post){
  if(post.reviewed!==true||!['Ready','Scheduled manually'].includes(post.status))return info('Verify and mark Ready before recording publication');
  var url=await requestPublishedUrl(post);
  if(!url)return;
- var errors=releaseChecks(Object.assign({},post,{status:'Published',publishedUrl:url}),true,true);
+ var proposed=Object.assign({},post,{status:'Published',publishedUrl:url});
+ var errors=releaseChecks(proposed,true,true);
  if(errors.length)return info('Cannot record publication: '+errors[0]);
+ try{await verifyPostImagesOnDevice([proposed])}catch(err){return info(err.message)}
  await changePosts([post],function(p){p.status='Published';p.publishedUrl=url;p.publishedExternallyAt=new Date().toISOString()},'Marked Published in HQ only. Nothing was sent from HQ.');
 }
 async function changeOneStatus(post,next){
