@@ -1119,7 +1119,7 @@ q('#body').addEventListener('change',async function(e){
 });
 /* Read only small, uncompressed ZIP files containing the official weekly manifest
    and seven PNG images. Data is processed entirely in the browser, never uploaded. */
-async function unpackLifeHQZip(file){
+async function unpackLifeHQZip(file,profilePack){
  if(!file||typeof file.arrayBuffer!=='function')throw Error('Choose the L-I-F-E ZIP from Files');
  if(!/\.zip$/i.test(file.name||''))throw Error('This button accepts the new L-I-F-E ZIP file');
  if(file.size<200||file.size>25000000)throw Error('ZIP must be between 200 bytes and 25 MB');
@@ -1143,7 +1143,7 @@ async function unpackLifeHQZip(file){
  if(eocd<0)throw Error('Cannot read the ZIP ending; download the new package again');
  if(u16(eocd+4)!==0||u16(eocd+6)!==0)throw Error('Multi-part ZIP files are not supported');
  var count=u16(eocd+10),centralSize=u32(eocd+12),centralStart=u32(eocd+16);
- if(count!==8||u16(eocd+8)!==count||centralStart+centralSize>eocd)throw Error('This is not the eight-file L-I-F-E ZIP package');
+ if((profilePack?(count<2||count>8):count!==8)||u16(eocd+8)!==count||centralStart+centralSize>eocd)throw Error('This ZIP has the wrong number of files');
  var cursor=centralStart,files=[],seen=new Set(),total=0;
  for(var i=0;i<count;i++){
   ensure(cursor,46);
@@ -1153,7 +1153,7 @@ async function unpackLifeHQZip(file){
   var recordSize=46+nameLen+extraLen+commentLen;
   ensure(cursor,recordSize);
   var filename=decode(cursor+46,nameLen);
-  if(seen.has(filename)||filename.indexOf('/')>=0||filename.indexOf('\\')>=0||!/^(LIFE-HQ-week-\d{4}-\d{2}-\d{2}\.json|[A-Za-z0-9_-]+\.png)$/.test(filename))throw Error('This ZIP has unexpected or duplicate files');
+  if(seen.has(filename)||filename.indexOf('/')>=0||filename.indexOf('\\')>=0||!(profilePack?/^(HQ-PROFILE-POSTS\.json|[A-Za-z0-9_-]+\.png)$/:/^(LIFE-HQ-week-\d{4}-\d{2}-\d{2}\.json|[A-Za-z0-9_-]+\.png)$/).test(filename))throw Error('This ZIP has unexpected or duplicate files');
   seen.add(filename);
   if(method!==0||sizeCompressed!==sizeRaw)throw Error('Use the new ZIP named L-I-F-E_HQ_UPLOAD_THIS. Older compressed ZIPs need extraction first');
   if((flags&1)||sizeRaw>8000000)throw Error('An image is encrypted or too large');
@@ -1170,7 +1170,7 @@ async function unpackLifeHQZip(file){
   files.push(new File([bytes],filename,{type:filename.endsWith('.png')?'image/png':'application/json'}));
   cursor+=recordSize;
  }
-  if(cursor!==centralStart+centralSize||files.filter(function(f){return f.name.endsWith('.png')}).length!==7||files.filter(function(f){return /^LIFE-HQ-week-\d{4}-\d{2}-\d{2}\.json$/.test(f.name)}).length!==1)throw Error('The ZIP must contain seven pictures and one weekly manifest');
+  if(cursor!==centralStart+centralSize||(profilePack?(files.filter(function(f){return f.name==='HQ-PROFILE-POSTS.json'}).length!==1&&true):false)||files.filter(function(f){return f.name.endsWith('.png')}).length!==count-1||(!profilePack&&files.filter(function(f){return /^LIFE-HQ-week-\d{4}-\d{2}-\d{2}\.json$/.test(f.name)}).length!==1))throw Error('The ZIP must contain one manifest and one picture per post');
  return files;
 }
 q('#body').addEventListener('change',async function(e){
