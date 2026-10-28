@@ -685,6 +685,75 @@ function exportCsv(kind){
 }
 
 function settings(){return '<div class="panel"><h3>Encrypted backups</h3><p>Your device holds encrypted workspace data. It is not linked to Google Drive yet.</p><div class="actions"><button class="btn primary" data-action="backupall">Download complete encrypted backup (including images)</button><button class="btn" data-action="backup">Posts-only backup</button><label class="btn">Restore complete backup<input id="fullbackupfile" type="file" accept=".json" hidden></label><label class="btn">Restore posts-only backup<input id="backupfile" type="file" accept=".json" hidden></label></div><p class="muted">Complete backups include encrypted images; posts-only backups do not. Store files privately with the workspace password. Trusted-device access is never included.</p><p><strong>Installing on your iPhone?</strong> Download a complete encrypted backup here first. Installed Home Screen web apps can have storage separate from Safari. After installing, use the Restore complete backup option if the app opens with no posts.</p><p><strong>Weekly import recovery:</strong> Before replacing weekly drafts, the app saves a separate encrypted recovery copy on this device. This does not open or download a JSON file.</p><button class="btn" type="button" data-action="restore-import-recovery">Restore workspace from before last weekly import</button></div><div class="warn">Still required: Google OAuth and live Google Drive synchronization. Scheduled posts are reminders only, not automatic publishing.</div>'}
+
+function profileRecordsFor(profileId,kind){return (data[kind]||[]).filter(function(x){return profileOf(x)===profileId})}
+function profilesPage(){
+ var choices=CHANNELS.map(function(c){return '<option>'+esc(c)+'</option>'}).join('');
+ return '<div class="panel hero"><h3>Profiles & accounts</h3><p>Choose the project using the top dropdown. Posts, pictures, calendar and reports stay separate.</p></div>'
+ +'<div class="panel"><h3>Add another profile</h3><form id="new-profile-form"><label class="field">Profile name<input name="name" required maxlength="80" placeholder="New account or project"></label><button class="btn primary" type="submit">+ Add profile</button></form><p class="muted">New profiles stay inside the existing encrypted workspace. No external social accounts are connected automatically.</p></div>'
+ +data.profiles.map(function(pr){
+  var accounts=pr.accounts||[];
+  return '<div class="panel hq-profile-card"><h3>'+esc(pr.name)+(pr.id===activeProfileId?' <span class="tag">Selected</span>':'')+'</h3><p class="muted">'+profileRecordsFor(pr.id,'posts').length+' posts · '+profileRecordsFor(pr.id,'media').length+' images</p>'
+   +(pr.id===activeProfileId?'':'<button class="btn primary" type="button" data-open-profile="'+esc(pr.id)+'">Switch to profile</button>')
+   +(pr.id==='life'?'<p class="muted">Existing L-I-F-E material remains here.</p>':'<form data-rename-profile="'+esc(pr.id)+'"><label class="field">Rename profile<input name="name" required maxlength="80" value="'+esc(pr.name)+'"></label><button class="btn" type="submit">Save name</button></form>')
+   +'<h3 style="margin-top:16px">Social account references</h3><p class="muted">Saved for planning only. Not a live Buffer or social account connection.</p>'
+   +(accounts.length?accounts.map(function(a,i){return '<div class="hq-profile-account"><strong>'+esc(a.service)+'</strong> · '+esc(a.handle)+(a.url?'<p><a class="link" href="'+esc(a.url)+'" target="_blank" rel="noopener noreferrer">Open profile</a></p>':'')+'<button type="button" class="btn danger" data-remove-account-from="'+esc(pr.id)+'" data-remove-account-number="'+i+'">Remove reference</button></div>'}).join(''):'<p class="muted">No accounts added yet.</p>')
+   +'<form data-add-account-to="'+esc(pr.id)+'"><label class="field">Platform<select name="service">'+choices+'</select></label><label class="field">Account name / @handle<input name="handle" required maxlength="160"></label><label class="field">Public account URL (optional)<input name="url" type="url" maxlength="1000" placeholder="https://..."></label><button class="btn" type="submit">Add account reference</button></form></div>';
+ }).join('')
+ +'<div class="warn">References do not connect or authorise social accounts. Select the genuine destination in Buffer before scheduling anything.</div>';
+}
+async function persistProfileMutation(change,message){
+ if(!data||!key||pendingSaves)throw Error('Finish the current save before editing profiles');
+ var prior=structuredClone(data.profiles);
+ try{change();validateWorkspace(data);if(!await save({skipRender:true}))throw Error('Encrypted device storage could not save');render();info(message)}
+ catch(err){data.profiles=prior;render();throw err}
+}
+q('#hq-profile-select').addEventListener('change',function(e){
+ var value=e.target.value;e.target.value=activeProfileId;
+ if(value==='_add'){navigate('profiles');q('#new-profile-form input')?.focus();return}
+ switchProfile(value).catch(function(err){info(err.message)});
+});
+q('#hq-manage-profiles').addEventListener('click',function(){if(data)navigate('profiles')});
+q('#body').addEventListener('click',async function(e){
+ var b=e.target.closest('button');if(!b||!data)return;
+ try{
+  if(b.dataset.action==='manageprofiles'){navigate('profiles');return}
+  if(b.dataset.openProfile){await switchProfile(b.dataset.openProfile);return}
+  if(b.dataset.removeAccountFrom!==undefined){
+   var pr=data.profiles.find(function(x){return x.id===b.dataset.removeAccountFrom}),i=Number(b.dataset.removeAccountNumber);
+   if(!pr||!Number.isInteger(i)||i<0||!pr.accounts?.[i])return;
+   if(!await confirmHQ('Remove this saved reference only? The actual account is unaffected.','Remove reference'))return;
+   await persistProfileMutation(function(){pr.accounts.splice(i,1)},'Local account reference removed');
+  }
+ }catch(err){info('Profile update failed: '+err.message)}
+});
+q('#body').addEventListener('submit',async function(e){
+ var form=e.target;if(form.id!=='new-profile-form'&&form.dataset.renameProfile===undefined&&form.dataset.addAccountTo===undefined)return;
+ e.preventDefault();
+ try{
+  var fields=new FormData(form),name=String(fields.get('name')||'').trim();
+  if(form.id==='new-profile-form'){
+   if(!name||name.length>80||data.profiles.length>=60)throw Error('Enter a profile name (up to 80 characters)');
+   if(data.profiles.some(function(p){return p.name.toLowerCase()===name.toLowerCase()}))throw Error('Profile name already exists');
+   var nextId='profile-'+id().slice(0,24);
+   await persistProfileMutation(function(){data.profiles.push({id:nextId,name:name,accounts:[]})},'Profile added');
+   await switchProfile(nextId);return;
+  }
+  var pr=data.profiles.find(function(x){return x.id===(form.dataset.renameProfile!==undefined?form.dataset.renameProfile:form.dataset.addAccountTo)});
+  if(!pr)throw Error('Profile not found');
+  if(form.dataset.renameProfile!==undefined){
+   if(pr.id==='life'||!name||name.length>80||data.profiles.some(function(p){return p.id!==pr.id&&p.name.toLowerCase()===name.toLowerCase()}))throw Error('Use a different profile name');
+   await persistProfileMutation(function(){pr.name=name},'Profile name updated');
+  }else{
+   var service=String(fields.get('service')||''),handle=String(fields.get('handle')||'').trim(),url=String(fields.get('url')||'').trim();
+   if(!CHANNELS.includes(service)||!handle||handle.length>160||url.length>1000||(url&&!safeUrl(url)))throw Error('Use a valid platform, account name and optional https:// link');
+   if(!Array.isArray(pr.accounts))pr.accounts=[];
+   if(pr.accounts.length>=30)throw Error('Too many account references');
+   await persistProfileMutation(function(){pr.accounts.push({service:service,handle:handle,url:url})},'Account reference saved (not connected)');
+  }
+ }catch(err){info('Could not save profile: '+err.message)}
+});
+
 function render(){if(!data)return;document.body.dataset.hqProfile=activeProfileId;renderProfileSwitcher();q('#body').innerHTML=section==='home'?top():section==='posts'?posts():section==='post'?postForm():section==='media'?mediaLibrary():section==='trash'?trash():section==='brand'?brandStudio():section==='calendar'?calendar():section==='contacts'?contacts():section==='contact'?contactForm():section==='connections'?connections():section==='campaigns'?campaigns():section==='ad'?adForm():section==='reports'?reports():section==='profiles'?profilesPage():settings();showMediaPreviews()}
 async function save(options){
  pendingSaves++;q('#lock').disabled=true;
