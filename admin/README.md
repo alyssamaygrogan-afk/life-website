@@ -99,3 +99,16 @@ Include a real image named \`garden.png\` alongside this JSON. Dates can be omit
 **Safety and recoverability:** The import is always **Draft** and never publishes, schedules or transfers content. It never overwrites earlier posts or approved work. The selected profile must match. Exact repeat packages (same manifest and image contents) are rejected to avoid duplicates; a changed picture produces a new package fingerprint. Every import makes an encrypted local recovery point before changing the workspace. The recovery screen can reverse that **profile's still-unapproved imported drafts only**, preserving other posts and profiles. Imported artwork stays in the private Media library for safety. A maximum of three new dated recovery snapshots are retained; older pre-update recovery points remain accessible with extra whole-workspace warnings. Always keep a separate **complete encrypted backup including images** before major edits or changing iPhone installation.
 
 No Instagram, Facebook or Buffer integration is activated by saving account handles or importing a profile ZIP. The Buffer handoff is still manual through iPhone sharing and requires user verification on the real destination.
+
+
+## Media Library refinements
+
+The Media screen is scoped to the selected HQ profile and now supports filename/description search, **All / Used in posts / Not used / Needs description** filters, and a load-more control (up to 48 thumbnail previews per page). Each image shows its file size, whether active or recoverable posts reference it, and a link to edit a post using the artwork. In-use and recoverable pictures are protected from binning. Search is briefly debounced to reduce repeated decryption/rendering on mobile.
+
+**Edit description** updates the selected media record's accessible description. It deliberately does not rewrite an already-approved post's own alt text; update and re-approve that post separately when needed.
+
+New **manual uploads** receive a SHA-256 fingerprint stored as private metadata inside the existing encrypted workspace. If a new uploaded file matches an existing valid image in the same profile, HQ reuses the already-encrypted image instead of saving another copy. Uploads to a different profile are separate. Older files and earlier ZIP imports did not have fingerprints, so duplicates among those older assets are not detected retroactively. If the old metadata exists but its encrypted image file is missing, the upload saves the replacement as a new picture. If any batch write or encrypted metadata save fails, newly stored files and the pending attachment list are rolled back; earlier pictures stay unchanged.
+
+No thumbnail, checksum, caption or image is sent to an external server during these local Media Library operations. This does not grant Buffer, Facebook or Instagram access to the images. Keep complete encrypted backups regularly, including the media library.
+
+Testing performed: isolated profile-scoped gallery rendering (search, filters, links, bin guard, pagination); media description save and failed-save rollback; new upload, same-profile deduplication, cross-profile isolation, second-file failure cleanup and failed encrypted-save cleanup. These are component-level tests, **not** a real iPhone Safari end-to-end check.
