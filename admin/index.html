@@ -417,13 +417,36 @@ var POST_STATUSES=['Draft','Needs review','Ready','Scheduled manually','Publishe
 var postFilter='all',postQuery='';
 function safeUrl(value){if(!value)return true;try{var u=new URL(value);return u.protocol==='https:'}catch(e){return false}}
 function isPublicStatus(status){return ['Ready','Scheduled manually','Published'].includes(status)}
+/* Single media-readiness rule used by full editor, quick approval and bulk review.
+   References must point to media metadata in the same internal profile. */
+function postMediaProblems(p){
+ var problems=[];
+ if(p.format!=='Image'&&p.format!=='Carousel')return problems;
+ var refs=Array.isArray(p.mediaRefs)&&p.mediaRefs.length?p.mediaRefs:
+  (String(p.assetRef||'').startsWith('localmedia:')?[p.assetRef]:[]);
+ if(!refs.length)problems.push('Attach the actual image from the HQ media library before approving.');
+ if(p.format==='Carousel'&&refs.length<2)problems.push('A carousel needs at least two saved images.');
+ if(p.format==='Image'&&refs.length>1)problems.push('Choose Carousel for a post with multiple images.');
+ if(refs.length>8)problems.push('A post may contain at most eight images.');
+ if(!String(p.altText||'').trim())problems.push('Add an accessible image description before approving.');
+ var known=new Set();
+ for(var ref of refs){
+  if(typeof ref!=='string'||!ref.startsWith('localmedia:')||ref.length<=11){problems.push('An artwork reference is not a saved HQ image.');continue}
+  if(known.has(ref)){problems.push('Remove duplicate artwork attachments.');continue}
+  known.add(ref);
+  var asset=(data.media||[]).find(function(m){return m.id===ref.slice(11)});
+  if(!asset||profileOf(asset)!==profileOf(p))problems.push('A referenced image is missing from this profile’s media library.');
+ }
+ return problems;
+}
 function releaseChecks(p,reviewed,postedExternally){
  var problems=[],tag=p.topic||'General';
  if(isPublicStatus(p.status)&&!reviewed)problems.push('Confirm that you reviewed this version of the post before marking it ready.');
  if(p.ctaUrl&&!safeUrl(p.ctaUrl))problems.push('The call-to-action link must be a valid https:// link.');
  if(p.publishedUrl&&!safeUrl(p.publishedUrl))problems.push('The published post link must be a valid https:// link.');
- if(isPublicStatus(p.status)&&(p.format==='Image'||p.format==='Carousel')&&!String(p.altText||'').trim())problems.push('Add image alt text before marking visual posts ready.');
+ if(isPublicStatus(p.status))problems.push.apply(problems,postMediaProblems(p));
  if(p.status==='Published'&&!postedExternally)problems.push('Only mark Published after confirming you posted it on the external platform.');
+ if(p.status==='Published'&&!String(p.publishedUrl||'').trim())problems.push('Add the verified public post URL before marking this post Published.');
  if(profileOf(p)==='life'&&isPublicStatus(p.status)&&tag==='Venue / tickets'){
   var details=data.launchChecks||{};
   if(dateUK()<'2026-12-03')problems.push('Venue/ticket posts cannot be marked ready before 3 December 2026.');
@@ -969,9 +992,11 @@ q('#body').addEventListener('submit',async function(e){
     return formProblem('#postformerror','This post changed since it was last approved. Untick then tick the review confirmation again before saving it as approved.');
    var errors=releaseChecks(p,f.has('reviewed'),f.has('postedExternally'));
    if(errors.length)return formProblem('#postformerror',errors.join(' '));
+   var beforePosts=data.posts;
    data.posts=data.posts.filter(function(z){return z.id!==p.id});data.posts.push(p);
-   if(await save({skipRender:true})){editing=null;navigate('posts');info(p.reviewed?'Review saved successfully; post is '+p.status:'Post saved as '+p.status)}
-   else formProblem('#postformerror','Saving failed in this browser. Keep this tab open; check device storage and try again. Your previous encrypted copy has not been replaced.');
+   var stored=await save({skipRender:true});
+   if(stored){editing=null;navigate('posts');info(p.reviewed?'Review saved successfully; post is '+p.status:'Post saved as '+p.status)}
+   else{data.posts=beforePosts;formProblem('#postformerror','Saving failed. Your previous encrypted post is still stored; this editor remains open so you can retry.');}
   }catch(err){formProblem('#postformerror','Could not save this post: '+err.message)}
  }else if(form.id==='contactform'){
   var c={id:contactEditing||id(),name:String(f.get('name')),category:String(f.get('category')),status:String(f.get('status')),notes:String(f.get('notes'))};
@@ -1089,8 +1114,11 @@ q('#body').addEventListener('change',async function(e){
    if(notice)notice.textContent='Unpacking and verifying the seven images on this phone…';
    files=await unpackLifeHQZip(files[0]);
   }
-  await importWeekPackage(files);
-  if(notice&&notice.isConnected){notice.textContent='Seven illustrated drafts imported. Review them in Posts.';notice.style.color='#22695f'}
+  var imported=await importWeekPackage(files);
+  if(notice&&notice.isConnected){
+   notice.textContent=imported?'Seven illustrated drafts imported. Review them in Posts.':'Import cancelled. Your previous drafts were kept.';
+   notice.style.color=imported?'#22695f':'#526778';
+  }
  }catch(err){
   if(notice&&notice.isConnected){notice.textContent='Import could not finish: '+err.message;notice.style.color='#922d37'}
   info('Import was not completed. Previous drafts were kept.');
@@ -1249,7 +1277,7 @@ async function importWeekPackage(fileList){
   replacements.push({profileId:'life',id:'life-package-'+date+'-'+id().slice(0,8),weeklyKey:p.weeklyKey,title:p.title,date:p.date,time:'',status:'Draft',caption:p.caption,topic:p.topic||'General',format:'Image',networks:['Facebook','Instagram','TikTok','LinkedIn'],assetRef:'localmedia:'+newMediaId,mediaRefs:['localmedia:'+newMediaId],altText:p.altText,platformCaptions:p.platformCaptions,reviewed:false,reviewedAt:'',notes:'Weekly image package — approval needed'});
  }
   var oldDrafts=profileRecords('posts').filter(function(p){return p.status==='Draft'&&expected.includes(p.date)&&p.weeklyKey==='LIFE-WEEK-'+p.date});
-  if(!await confirmHQ('Import seven posts dated '+expected[0]+' to '+expected[6]+'? '+oldDrafts.length+' existing unapproved weekly drafts will go to the Recycle Bin. Other drafts, approved posts and campaigns stay unchanged; encrypted recovery is saved first. Nothing is published.','Import seven drafts'))return;
+  if(!await confirmHQ('Import seven posts dated '+expected[0]+' to '+expected[6]+'? '+oldDrafts.length+' existing unapproved weekly drafts will go to the Recycle Bin. Other drafts, approved posts and campaigns stay unchanged; encrypted recovery is saved first. Nothing is published.','Import seven drafts'))return false;
  // Automatic file downloads open a JSON preview in iPhone in-app browsers.
  // Use an encrypted IndexedDB recovery point instead of triggering a download.
  try{await savePreImportRecovery()}
@@ -1270,6 +1298,7 @@ async function importWeekPackage(fileList){
   if(!await save({skipRender:true}))throw Error('Could not save the encrypted replacement drafts');
   navigate('posts');
   info('Seven illustrated L-I-F-E drafts imported successfully. Nothing published.');
+  return true;
  }catch(err){
   // Roll back the entire import, including new artwork, so retries are safe.
   data.posts=originalPosts;data.media=originalMedia;data.trash=originalTrash;
@@ -1591,9 +1620,19 @@ function trash(){
   return '<div class="bin-item"><div><strong>'+esc(itemName)+'</strong><p class="muted">'+esc(item.kind)+' · Deleted '+esc(itemDate)+'</p></div><div class="actions"><button class="btn" data-restore-trash="'+esc(item.id)+'">Restore</button><button class="btn danger" data-purge-trash="'+esc(item.id)+'">Delete permanently</button></div></div>';
  }).join(''):'<p>The bin is empty. Deleted posts, contacts, campaign plans and media will appear here.</p>')+'</div>';
 }
+function mediaReferenceCount(mediaId){
+ var ref='localmedia:'+mediaId,count=0;
+ for(var p of (data.posts||[]))if(p.assetRef===ref||(p.mediaRefs||[]).includes(ref))count++;
+ for(var t of (data.trash||[]))if(t.kind==='post'&&t.record&&(t.record.assetRef===ref||(t.record.mediaRefs||[]).includes(ref)))count++;
+ return count;
+}
 async function permanentlyRemove(binId){
  var item=(data.trash||[]).find(function(x){return x.id===binId});if(!item)return;
- if(item.kind==='media')await mediaRemove(item.record.id);
+ if(item.kind==='media'){
+  var references=mediaReferenceCount(item.record.id);
+  if(references)throw Error('This image is referenced by '+references+' saved or recycled post(s). Remove those references before permanently deleting its artwork.');
+  await mediaRemove(item.record.id);
+ }
  data.trash=data.trash.filter(function(x){return x.id!==binId});
 }
 async function restoreFromBin(binId){
@@ -1640,8 +1679,8 @@ function readyIssues(post){
  if(!String(post.title||'').trim()||!String(post.caption||'').trim())issues.push('The title and main caption are required');
  if(['Image','Carousel'].includes(post.format)){
   var refs=Array.isArray(post.mediaRefs)&&post.mediaRefs.length?post.mediaRefs:(String(post.assetRef||'').startsWith('localmedia:')?[post.assetRef]:[]);
-  if(!refs.length||refs.some(function(r){return typeof r!=='string'||!r.startsWith('localmedia:')}))issues.push('Attach the real HQ artwork, not a filename');
-  if(post.format==='Carousel'&&refs.length<2)issues.push('Add at least two carousel images');
+  // Media rules above are already checked in releaseChecks for this Ready post.
+  // Keep every review path consistent with the full editor.
  }
  if(['Published','Scheduled manually'].includes(post.status))issues.push('An already externally recorded post needs editing, not re-verifying as Ready');
  return issues;
