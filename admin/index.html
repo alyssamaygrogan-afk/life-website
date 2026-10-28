@@ -518,6 +518,7 @@ function posts(){
   return byStatus&&bySearch;
  }).sort(function(a,b){return (a.date||'9999').localeCompare(b.date||'9999')});
  var out='<div class="tool-tabs" role="tablist" aria-label="Post status">'+['all'].concat(POST_STATUSES).map(function(v){return '<button type="button" role="tab" data-status-tab="'+esc(v)+'" aria-selected="'+String(postFilter===v)+'">'+(v==='all'?'All':esc(v))+' ('+(v==='all'?profileRecords('posts').length:profileRecords('posts').filter(function(p){return p.status===v}).length)+')</button>'}).join('')+'</div><div class="actions"><button class="btn primary" data-action="newpost">New post</button><button class="btn" type="button" data-action="jumpverification">Verification / bulk actions</button><button class="btn danger" data-action="trashselected" type="button">Move selected to bin</button><button class="btn" data-life-only data-action="weekly">Prepare weekly drafts</button><button class="btn" data-life-only data-action="prompts">Generate countdown drafts</button></div><div class="panel" data-life-only><h3>Match captions to the seven picture cards</h3><p>Correct the Facebook, Instagram, TikTok and LinkedIn wording for the existing seven dated draft posts. Only private drafts from this week are changed. All attached images stay as they are.</p><button class="btn primary" type="button" data-action="match-seven-captions">Match captions to images</button><p class="muted">A private encrypted recovery copy is kept before changes. Review everything before approving or scheduling.</p></div><div class="panel" data-life-only><h3>Import seven posts and their pictures</h3><p>Upload a <strong>L-I-F-E HQ weekly ZIP</strong> straight from iPhone Files — no unzipping. Seven captions and their individual pictures import as private drafts for the week in the file. Only existing unapproved weekly drafts for those dates go to the Recycle Bin; approved posts, other drafts and campaigns stay. An encrypted local recovery copy is saved first. No Buffer publishing.</p><label class="btn primary">Upload one ZIP file<input id="weekpackagezip" type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden></label><label class="btn">Or select extracted files<input id="weekpackage" type="file" accept=".json,.png,image/png,application/json" multiple hidden></label><p id="week-import-status" role="status" aria-live="polite" class="muted">Choose the L-I-F-E HQ weekly ZIP directly from iPhone Files. No unzipping required.</p></div>';
+ out+='<div class="panel"><h3>Import posts and images for '+esc(profileName())+'</h3><p>Use a profile-specific HQ ZIP to import one to seven captions with their individual PNG images. These become private drafts only. Existing posts, approved content and other profiles stay untouched. The package must name this exact profile, and encrypted recovery is prepared first.</p><label class="btn primary">Choose profile ZIP<input id="profilepackagezip" type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden></label><label class="btn">Or choose extracted JSON + PNG files<input id="profilepackagefiles" type="file" accept=".json,.png,image/png,application/json" multiple hidden></label><p id="profile-import-status" role="status" aria-live="polite" class="muted">Package format: HQ-PROFILE-POSTS.json plus one PNG for each dated or undated post. Nothing will publish automatically.</p></div>';
  out+='<div class="panel"><h3>Quick draft inbox</h3><p class="muted">Paste a new caption written here or prepared in ChatGPT. It becomes an unpublished draft for this profile in your device workspace; no automatic publishing or internet sync.</p><label class="field">Draft caption<textarea id="quick-caption" maxlength="10000" rows="4" placeholder="Paste a caption or write a new L-I-F-E post..."></textarea></label><div class="actions"><button type="button" class="btn primary" data-action="quickdraft">Save as new draft</button><button type="button" class="btn" data-action="newpost">Open full editor</button></div></div>';
  out+='<div class="panel" id="bulk-post-panel"><h3>Verification and publishing shortcuts</h3><p class="muted">Select individual posts or all currently shown. You can change local status, verify the captions and artwork together, or open approved posts for a manual Buffer handoff. This does not send, schedule or publish automatically.</p><label class="setup-check"><input type="checkbox" id="select-visible-posts" '+(list.length&&list.every(function(p){return selectedPostIds.has(p.id)})?'checked':'')+'> Select all '+list.length+' shown posts</label><p class="batch-count" id="post-selected-count" aria-live="polite">'+selectedPostIds.size+' selected</p><div class="batch-actions"><label>Change selected posts<select id="bulk-post-operation"><option value="">Choose an action…</option><option value="Draft">Set to Draft</option><option value="Needs review">Request review</option><option value="Ready">Verify and mark Ready</option><option value="Scheduled manually">Record as scheduled outside HQ</option><option value="handoff">Share approved posts via Buffer (one by one)</option></select></label><button class="btn primary" type="button" data-action="applybulkposts">Apply to selected</button><button class="btn" type="button" data-action="clearselection">Clear selection</button></div><p class="muted">To record a published post, use that post’s “Record externally published” button and give its public link.</p></div>';
  out+='<div class="panel"><div class="post-tools"><label>Find a post<input id="postsearch" value="'+esc(postQuery)+'" placeholder="Title, caption or date"></label><label>Filter by status<select id="postfilter"><option value="all">All statuses</option>'+POST_STATUSES.map(function(v){return '<option value="'+esc(v)+'" '+(v===postFilter?'selected':'')+'>'+esc(v)+'</option>'}).join('')+'</select></label></div><p class="muted">Showing '+list.length+' of '+profileRecords('posts').length+' posts. Draft and scheduled dates are local planning only.</p></div>';
@@ -1318,6 +1319,28 @@ function showMediaPreviews(){
 }
 
 /* Universal image-and-caption draft pack. No publishing credentials or external calls. */
+q('#body').addEventListener('change',async function(e){
+ var control=e.target;
+ if(control.id!=='profilepackagezip'&&control.id!=='profilepackagefiles')return;
+ var notice=q('#profile-import-status');
+ try{
+  var files=Array.from(control.files||[]);
+  if(!files.length)return;
+  if(notice)notice.textContent='Checking the selected '+profileName()+' package…';
+  if(control.id==='profilepackagezip'){
+   if(files.length!==1)throw Error('Choose one HQ profile ZIP file');
+   files=await unpackLifeHQZip(files[0],true);
+  }
+  var imported=await importProfilePackage(files);
+  if(notice&&notice.isConnected){
+   notice.textContent=imported===true?'Private drafts imported successfully. Open Posts to review.':'Import cancelled — nothing was added.';
+  }
+ }catch(err){
+  if(notice&&notice.isConnected)notice.textContent='No posts imported: '+err.message;
+  info('Import not completed: '+err.message);
+ }finally{control.value=''}
+});
+
 async function importProfilePackage(fileList){
  if(!data||!key||pendingSaves)throw Error('Unlock HQ and finish saving first');
  var files=Array.from(fileList||[]),manifest=files.filter(function(f){return f.name==='HQ-PROFILE-POSTS.json'});
