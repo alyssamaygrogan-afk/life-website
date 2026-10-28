@@ -264,7 +264,7 @@ function posts(){
   var bySearch=!search||[x.title,x.caption,x.date,(x.networks||[]).join(' '),x.topic].join(' ').toLowerCase().includes(search);
   return byStatus&&bySearch;
  }).sort(function(a,b){return (a.date||'9999').localeCompare(b.date||'9999')});
- var out='<div class="tool-tabs" role="tablist" aria-label="Post status">'+['all'].concat(POST_STATUSES).map(function(v){return '<button type="button" role="tab" data-status-tab="'+esc(v)+'" aria-selected="'+String(postFilter===v)+'">'+(v==='all'?'All':esc(v))+' ('+(v==='all'?data.posts.length:data.posts.filter(function(p){return p.status===v}).length)+')</button>'}).join('')+'</div><div class="actions"><button class="btn primary" data-action="newpost">New post</button><button class="btn danger" data-action="trashselected" type="button">Move selected to bin</button><button class="btn" data-action="weekly">Prepare weekly drafts</button><button class="btn" data-action="prompts">Generate countdown drafts</button></div><div class="panel"><h3>Match captions to the seven picture cards</h3><p>Correct the Facebook, Instagram, TikTok and LinkedIn wording for the existing seven dated draft posts. Only private drafts from this week are changed. All attached images stay as they are.</p><button class="btn primary" type="button" data-action="match-seven-captions">Match captions to images</button><p class="muted">A private encrypted recovery copy is kept before changes. Review everything before approving or scheduling.</p></div><div class="panel"><h3>Import the seven 26 Oct – 1 Nov drafts and images</h3><p>Upload the new single <strong>L-I-F-E HQ ZIP</strong> directly. You do not need to unzip it. Alternatively select the JSON and seven PNGs together. This replaces only <strong>draft</strong> posts for those seven days. Other posts, contacts and campaigns stay untouched. An encrypted recovery copy is kept on this device first, without opening a JSON file. Your original drafts go to the Recycle Bin. Artwork stays private and encrypted, never sent to Buffer.</p><label class="btn primary">Upload one ZIP file<input id="weekpackagezip" type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden></label><label class="btn">Or select extracted files<input id="weekpackage" type="file" accept=".json,.png,image/png,application/json" multiple hidden></label><p id="week-import-status" role="status" aria-live="polite" class="muted">Choose the new L-I-F-E ZIP package directly from iPhone Files. No unzipping required.</p></div>';
+ var out='<div class="tool-tabs" role="tablist" aria-label="Post status">'+['all'].concat(POST_STATUSES).map(function(v){return '<button type="button" role="tab" data-status-tab="'+esc(v)+'" aria-selected="'+String(postFilter===v)+'">'+(v==='all'?'All':esc(v))+' ('+(v==='all'?data.posts.length:data.posts.filter(function(p){return p.status===v}).length)+')</button>'}).join('')+'</div><div class="actions"><button class="btn primary" data-action="newpost">New post</button><button class="btn danger" data-action="trashselected" type="button">Move selected to bin</button><button class="btn" data-action="weekly">Prepare weekly drafts</button><button class="btn" data-action="prompts">Generate countdown drafts</button></div><div class="panel"><h3>Match captions to the seven picture cards</h3><p>Correct the Facebook, Instagram, TikTok and LinkedIn wording for the existing seven dated draft posts. Only private drafts from this week are changed. All attached images stay as they are.</p><button class="btn primary" type="button" data-action="match-seven-captions">Match captions to images</button><p class="muted">A private encrypted recovery copy is kept before changes. Review everything before approving or scheduling.</p></div><div class="panel"><h3>Import seven posts and their pictures</h3><p>Upload a <strong>L-I-F-E HQ weekly ZIP</strong> straight from iPhone Files — no unzipping. Seven captions and their individual pictures import as private drafts for the week in the file. Only existing unapproved weekly drafts for those dates go to the Recycle Bin; approved posts, other drafts and campaigns stay. An encrypted local recovery copy is saved first. No Buffer publishing.</p><label class="btn primary">Upload one ZIP file<input id="weekpackagezip" type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden></label><label class="btn">Or select extracted files<input id="weekpackage" type="file" accept=".json,.png,image/png,application/json" multiple hidden></label><p id="week-import-status" role="status" aria-live="polite" class="muted">Choose the L-I-F-E HQ weekly ZIP directly from iPhone Files. No unzipping required.</p></div>';
  out+='<div class="panel"><h3>Quick draft inbox</h3><p class="muted">Paste a new caption written here or prepared in ChatGPT. It becomes an unpublished L-I-F-E draft in this device workspace; no automatic publishing or internet sync.</p><label class="field">Draft caption<textarea id="quick-caption" maxlength="10000" rows="4" placeholder="Paste a caption or write a new L-I-F-E post..."></textarea></label><div class="actions"><button type="button" class="btn primary" data-action="quickdraft">Save as new draft</button><button type="button" class="btn" data-action="newpost">Open full editor</button></div></div>';
  out+='<div class="panel"><div class="post-tools"><label>Find a post<input id="postsearch" value="'+esc(postQuery)+'" placeholder="Title, caption or date"></label><label>Filter by status<select id="postfilter"><option value="all">All statuses</option>'+POST_STATUSES.map(function(v){return '<option value="'+esc(v)+'" '+(v===postFilter?'selected':'')+'>'+esc(v)+'</option>'}).join('')+'</select></label></div><p class="muted">Showing '+list.length+' of '+data.posts.length+' posts. Draft and scheduled dates are local planning only.</p></div>';
  out+='<div class="panel">'+(list.length?list.map(function(x){
@@ -812,7 +812,7 @@ async function unpackLifeHQZip(file){
   var recordSize=46+nameLen+extraLen+commentLen;
   ensure(cursor,recordSize);
   var filename=decode(cursor+46,nameLen);
-  if(seen.has(filename)||filename.indexOf('/')>=0||filename.indexOf('\\')>=0||!/^(LIFE-HQ-week-2026-10-26\.json|[A-Za-z0-9_-]+\.png)$/.test(filename))throw Error('This ZIP has unexpected or duplicate files');
+  if(seen.has(filename)||filename.indexOf('/')>=0||filename.indexOf('\\')>=0||!/^(LIFE-HQ-week-\d{4}-\d{2}-\d{2}\.json|[A-Za-z0-9_-]+\.png)$/.test(filename))throw Error('This ZIP has unexpected or duplicate files');
   seen.add(filename);
   if(method!==0||sizeCompressed!==sizeRaw)throw Error('Use the new ZIP named L-I-F-E_HQ_UPLOAD_THIS. Older compressed ZIPs need extraction first');
   if((flags&1)||sizeRaw>8000000)throw Error('An image is encrypted or too large');
@@ -829,7 +829,7 @@ async function unpackLifeHQZip(file){
   files.push(new File([bytes],filename,{type:filename.endsWith('.png')?'image/png':'application/json'}));
   cursor+=recordSize;
  }
- if(cursor!==centralStart+centralSize||files.filter(function(f){return f.name.endsWith('.png')}).length!==7||!seen.has('LIFE-HQ-week-2026-10-26.json'))throw Error('The ZIP is missing some of its required files');
+  if(cursor!==centralStart+centralSize||files.filter(function(f){return f.name.endsWith('.png')}).length!==7||files.filter(function(f){return /^LIFE-HQ-week-\d{4}-\d{2}-\d{2}\.json$/.test(f.name)}).length!==1)throw Error('The ZIP must contain seven pictures and one weekly manifest');
  return files;
 }
 q('#body').addEventListener('change',async function(e){
@@ -843,7 +843,7 @@ q('#body').addEventListener('change',async function(e){
    files=await unpackLifeHQZip(files[0]);
   }
   await importWeekPackage(files);
-  if(notice&&notice.isConnected){notice.textContent='Import finished. Check the seven draft posts above.';notice.style.color='#22695f'}
+  if(notice&&notice.isConnected){notice.textContent='Seven illustrated drafts imported. Review them in Posts.';notice.style.color='#22695f'}
  }catch(err){
   if(notice&&notice.isConnected){notice.textContent='Import could not finish: '+err.message;notice.style.color='#922d37'}
   info('Import was not completed. Previous drafts were kept.');
@@ -975,23 +975,32 @@ function showMediaPreviews(){
 async function importWeekPackage(fileList){
  if(!data||!key)throw Error('Unlock your L-I-F-E HQ workspace first');
  if(pendingSaves)throw Error('Finish saving your current work before importing');
- var files=Array.from(fileList||[]),manifests=files.filter(function(f){return f.name==='LIFE-HQ-week-2026-10-26.json'});
- if(manifests.length!==1)throw Error('Unzip the package first, then select its JSON file and all seven PNG images together');
- var pack=JSON.parse(await manifests[0].text());
- if(pack.packageType!=='LIFE-HQ-draft-package'||pack.version!==1||pack.brand!=='L-I-F-E'||pack.weekStart!=='2026-10-26'||pack.weekEnd!=='2026-11-01'||!Array.isArray(pack.posts)||pack.posts.length!==7)throw Error('This is not the correct seven-day L-I-F-E package');
- var expected=['2026-10-26','2026-10-27','2026-10-28','2026-10-29','2026-10-30','2026-10-31','2026-11-01'];
- var mediaFiles={};files.forEach(function(f){if(f.name.toLowerCase().endsWith('.png'))mediaFiles[f.name]=f});
- var replacements=[],staged=[];
+ var files=Array.from(fileList||[]),manifests=files.filter(function(f){return /^LIFE-HQ-week-\d{4}-\d{2}-\d{2}\.json$/.test(f.name)});
+  if(manifests.length!==1||files.length!==8||files.filter(function(f){return /^[A-Za-z0-9_-]+\.png$/.test(f.name)}).length!==7)
+   throw Error('Choose one dated L-I-F-E manifest and its seven PNG pictures');
+  if(manifests[0].size>100000)throw Error('Weekly manifest is too large');
+  var pack=JSON.parse(await manifests[0].text()),weekStart=pack.weekStart;
+  if(typeof weekStart!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(weekStart))throw Error('Invalid week start');
+  var firstDay=new Date(weekStart+'T12:00:00Z');
+  if(!Number.isFinite(firstDay.getTime())||firstDay.toISOString().slice(0,10)!==weekStart||firstDay.getUTCDay()!==1||weekStart<'2026-10-26'||weekStart>'2027-01-25')
+   throw Error('The package must start on a Monday during the L-I-F-E countdown');
+  var expected=Array.from({length:7},function(_,i){return addDays(weekStart,i)});
+  if(pack.packageType!=='LIFE-HQ-draft-package'||pack.version!==1||pack.brand!=='L-I-F-E'||pack.weekEnd!==expected[6]||manifests[0].name!=='LIFE-HQ-week-'+weekStart+'.json'||!Array.isArray(pack.posts)||pack.posts.length!==7)
+   throw Error('The package dates, branding or seven daily posts do not match');
+  var mediaFiles={};files.forEach(function(f){if(f.name.toLowerCase().endsWith('.png'))mediaFiles[f.name]=f});
+ var replacements=[],staged=[],usedNames=new Set();
  for(var i=0;i<7;i++){
   var p=pack.posts[i],date=expected[i];
   if(!p||p.date!==date||p.status!=='Draft'||p.weeklyKey!=='LIFE-WEEK-'+date||typeof p.assetRef!=='string'||!/^[a-zA-Z0-9_-]+\.png$/.test(p.assetRef)||!mediaFiles[p.assetRef]||typeof p.caption!=='string'||!p.caption||p.caption.length>10000||typeof p.title!=='string'||p.title.length>150||typeof p.altText!=='string'||!p.altText||!p.platformCaptions||!['Facebook','Instagram','TikTok','LinkedIn'].every(function(n){return typeof p.platformCaptions[n]==='string'&&p.platformCaptions[n].length<=10000}))
    throw Error('The package is missing the post or image for '+date);
-  var newMediaId='weekly-'+date+'-'+id().slice(0,8);
+   if(usedNames.has(p.assetRef))throw Error('Each date needs its own picture');
+   usedNames.add(p.assetRef);
+   var newMediaId='weekly-'+date+'-'+id().slice(0,8);
   staged.push({id:newMediaId,file:mediaFiles[p.assetRef],name:p.assetRef,altText:p.altText,date:date});
   replacements.push({id:'life-package-'+date+'-'+id().slice(0,8),weeklyKey:p.weeklyKey,title:p.title,date:p.date,time:'',status:'Draft',caption:p.caption,topic:p.topic||'General',format:'Image',networks:['Facebook','Instagram','TikTok','LinkedIn'],assetRef:'localmedia:'+newMediaId,mediaRefs:['localmedia:'+newMediaId],altText:p.altText,platformCaptions:p.platformCaptions,reviewed:false,reviewedAt:'',notes:'Weekly image package — approval needed'});
  }
- var oldDrafts=data.posts.filter(function(p){return p.status==='Draft'&&p.date>='2026-10-26'&&p.date<='2026-11-01'});
- if(!await confirmHQ('Replace '+oldDrafts.length+' existing drafts dated 26 October–1 November with seven new posts and their images? Your originals will be kept in the Recycle Bin and a private encrypted recovery snapshot saved on this device. Nothing will be published.','Import seven drafts'))return;
+  var oldDrafts=data.posts.filter(function(p){return p.status==='Draft'&&expected.includes(p.date)&&p.weeklyKey==='LIFE-WEEK-'+p.date});
+  if(!await confirmHQ('Import seven posts dated '+expected[0]+' to '+expected[6]+'? '+oldDrafts.length+' existing unapproved weekly drafts will go to the Recycle Bin. Other drafts, approved posts and campaigns stay unchanged; encrypted recovery is saved first. Nothing is published.','Import seven drafts'))return;
  // Automatic file downloads open a JSON preview in iPhone in-app browsers.
  // Use an encrypted IndexedDB recovery point instead of triggering a download.
  try{await savePreImportRecovery()}
