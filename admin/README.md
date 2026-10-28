@@ -112,3 +112,19 @@ New **manual uploads** receive a SHA-256 fingerprint stored as private metadata 
 No thumbnail, checksum, caption or image is sent to an external server during these local Media Library operations. This does not grant Buffer, Facebook or Instagram access to the images. Keep complete encrypted backups regularly, including the media library.
 
 Testing performed: isolated profile-scoped gallery rendering (search, filters, links, bin guard, pagination); media description save and failed-save rollback; new upload, same-profile deduplication, cross-profile isolation, second-file failure cleanup and failed encrypted-save cleanup. These are component-level tests, **not** a real iPhone Safari end-to-end check.
+
+## Manual per-platform publishing receipts
+
+The Posts screen now displays per-channel external-posting progress, with records entered by the user. These are **not provider-verified Buffer receipts**.
+
+1. Approve a post and hand off via iPhone sharing or manually in Buffer. A successful share-sheet action is not proof of scheduling or publication.
+2. After checking the actual correct external account, open More actions > Record external result. Select the platform and whether it is queued/scheduled or live. Give the real account name; live results require a real HTTPS public URL. Confirm that you personally checked.
+3. HQ saves the result, source=manual, timestamp and content revision in its encrypted workspace. It does not contact Buffer.
+4. A multi-platform post stays Ready while some platforms are outstanding. It becomes Scheduled manually when all selected platforms have a scheduled/live entry; Published only when all are recorded live. Earlier records remain in the history.
+5. Reports shows the number of manually recorded external results and outstanding platforms. Legacy Published statuses without per-channel records are labelled as older records.
+
+Quick status selection for Scheduled/Published opens the same per-channel record dialog. Bulk status changes cannot fake an external schedule. Editing substantive content of an externally recorded post is blocked; duplicate the post as a new draft and retain its earlier record. Manual performance numbers remain editable.
+
+Limitations: account handles are self-entered notes, not authenticated channels. True Buffer verification requires a protected server API token, confirmed channel IDs, and real provider response receipts. Never put the Buffer API key in the public static app. Private encrypted device images do not become public URLs automatically. Current Buffer GraphQL draft creation is available on Free but is not connected to HQ.
+
+References: https://developers.buffer.com/examples/create-draft-post.html ; https://developers.buffer.com/guides/authentication.html
