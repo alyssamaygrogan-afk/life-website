@@ -296,6 +296,26 @@ function validateWorkspace(d){
   if(p.reviewed!==undefined&&typeof p.reviewed!=='boolean')throw Error('Invalid review record');
   if(p.scheduledExternallyConfirmed!==undefined&&typeof p.scheduledExternallyConfirmed!=='boolean')throw Error('Invalid external scheduling confirmation');
  }
+ for(var post of d.posts){
+  if(post.contentRevision!==undefined&&(!Number.isSafeInteger(post.contentRevision)||post.contentRevision<0||post.contentRevision>1000000))throw Error('Invalid content revision');
+  if(post.publicationReceipts!==undefined){
+   if(!Array.isArray(post.publicationReceipts)||post.publicationReceipts.length>150)throw Error('Invalid publication records');
+   var receiptIds=new Set();
+   for(var receipt of post.publicationReceipts){
+    if(!receipt||!isText(receipt.id,120)||!receipt.id||receiptIds.has(receipt.id)||
+     receipt.source!=='manual'||!['scheduled','published'].includes(receipt.stage)||
+     !['Facebook','Instagram','TikTok','LinkedIn','Threads','YouTube','Pinterest'].includes(receipt.platform)||
+     !isText(receipt.account,160)||!receipt.account.trim()||
+     !isText(receipt.recordedAt,40)||!Number.isFinite(Date.parse(receipt.recordedAt))||
+     !Number.isSafeInteger(receipt.revision)||receipt.revision<0||
+     !isText(receipt.publicUrl,2000)||!isText(receipt.scheduledFor,40)||
+     (receipt.stage==='published'&&(!receipt.publicUrl||!safeUrl(receipt.publicUrl)))||
+     (receipt.publicUrl&&!safeUrl(receipt.publicUrl))||
+     (receipt.scheduledFor&&!/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]$/.test(receipt.scheduledFor)))throw Error('Invalid manual publication record');
+    receiptIds.add(receipt.id);
+   }
+  }
+ }
  if(d.launchChecks!==undefined){
   var v=d.launchChecks;
   if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Invalid release checklist');
@@ -511,6 +531,27 @@ function releaseChecks(p,reviewed,postedExternally){
  if(isPublicStatus(p.status)&&(!Array.isArray(p.networks)||!p.networks.length))problems.push('Select at least one target platform.');
  return problems;
 }
+
+/* Manual per-platform log. A user-entered record is NEVER provider confirmation. */
+function publishingReceiptRevision(p){return Number.isSafeInteger(p.contentRevision)&&p.contentRevision>=0?p.contentRevision:0}
+function currentPublicationReceipts(p){return (Array.isArray(p.publicationReceipts)?p.publicationReceipts:[]).filter(function(r){return r&&r.source==='manual'&&r.revision===publishingReceiptRevision(p)})}
+function manualPublishingProgress(p){
+ var channels=Array.from(new Set((p.networks||[]).filter(function(x){return CHANNELS.includes(x)})));
+ var last={};currentPublicationReceipts(p).forEach(function(r){if(channels.includes(r.platform))last[r.platform]=r});
+ var live=channels.filter(function(x){return last[x]&&last[x].stage==='published'}).length;
+ var covered=channels.filter(function(x){return last[x]&&['scheduled','published'].includes(last[x].stage)}).length;
+ return {total:channels.length,live:live,covered:covered,last:last,allPublished:channels.length>0&&live===channels.length,allAccounted:channels.length>0&&covered===channels.length};
+}
+function manualReceiptDetails(p){
+ var list=currentPublicationReceipts(p),progress=manualPublishingProgress(p),legacy=!list.length&&['Published','Scheduled manually'].includes(p.status);
+ return '<div class="manual-receipt-summary"><strong>External publishing — user-entered only</strong><p class="muted">'+progress.live+' / '+progress.total+' platforms reported live · '+progress.covered+' scheduled or live'+(legacy?' · Legacy overall status (no channel receipt)':'')+'</p>'
+ +(list.length?'<details><summary>View '+list.length+' manual record'+(list.length===1?'':'s')+'</summary>'+list.slice().reverse().map(function(r){
+  return '<p class="muted">'+esc(r.platform)+' · '+esc(r.stage)+' · '+esc(r.account)+' · '+esc(r.recordedAt.slice(0,16).replace('T',' '))
+   +(r.scheduledFor?' · due '+esc(r.scheduledFor.replace('T',' ')):'')
+   +(r.publicUrl?' · <a href="'+esc(r.publicUrl)+'" target="_blank" rel="noopener noreferrer">Public link</a>':'')+'</p>'
+ }).join('')+'</details>':'<p class="muted">No per-platform manual records yet.</p>')+'</div>';
+}
+
 function posts(){
  var list=profileRecords('posts').slice().filter(function(x){
   var byStatus=postFilter==='all'||x.status===postFilter;
