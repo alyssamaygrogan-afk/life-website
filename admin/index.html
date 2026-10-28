@@ -233,6 +233,7 @@ function ensureProfiles(){
 }
 function renderProfileSwitcher(){
  var select=q('#hq-profile-select');if(!data||!select)return;
+ ensureProfiles();
  select.innerHTML=data.profiles.map(function(p){return '<option value="'+esc(p.id)+'" '+(activeProfileId===p.id?'selected':'')+'>'+esc(p.name)+'</option>'}).join('')+'<option value="_add">+ Add a profile…</option>';
 }
 async function switchProfile(next){
