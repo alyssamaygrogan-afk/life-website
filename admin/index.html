@@ -1516,13 +1516,35 @@ function mediaComposer(){
  +'<div class="brand-rainbow"></div><h3>Make a branded square card</h3><label class="field">Card headline<input id="card-headline" maxlength="100" placeholder="e.g. 90 DAYS TO GO!"></label>'
  +'<button class="btn" type="button" data-action="makebrandcard" data-life-only>Generate branded 1080 × 1080 image</button></div>';
 }
+var mediaQuery='',mediaFilter='all';
+function mediaPostUsage(mediaId){
+ var ref='localmedia:'+mediaId;
+ var active=profileRecords('posts').filter(function(p){return postMediaRefs(p).includes(ref)});
+ var deleted=(data.trash||[]).filter(function(t){return t.kind==='post'&&inProfile(t.record)&&postMediaRefs(t.record).includes(ref)});
+ return {active:active,recoverable:deleted.length};
+}
 function mediaLibrary(){
- var items=profileRecords('media').slice().sort(function(a,b){return (b.createdAt||'').localeCompare(a.createdAt||'')});
- return '<div class="panel hero"><h3>Media library</h3><p>Upload, preview and reuse your own images for this profile. Stored privately and encrypted on this device. File sizes up to 8 MB each.</p><strong>'+items.length+' assets</strong></div>'
- +'<div class="panel upload-zone" id="media-drop"><h3>▧ Add your images</h3><p>Choose PNG, JPEG or WebP files, or drag and drop them here.</p><label class="btn primary">Upload images<input id="library-image-upload" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden></label></div>'
- +'<div class="panel"><h3>My images</h3><div class="tile-grid">'+(items.length?items.map(function(m){
-  return '<div class="media-tile"><img data-hq-media="'+esc(m.id)+'" alt="'+esc(m.altText||m.name)+'"><small title="'+esc(m.name)+'">'+esc(m.name)+'</small><small>'+Math.max(1,Math.round((m.size||0)/1024))+' KB</small><div class="actions"><button class="btn" data-use-media="'+esc(m.id)+'">New post</button><button class="btn" data-export-media="'+esc(m.id)+'">Save copy</button><button class="btn danger" data-trash-media="'+esc(m.id)+'">Bin</button></div></div>';
- }).join(''):'<p>No uploaded images yet. Add some above, or import the weekly image package from Posts.</p>')+'</div></div>';
+ var all=profileRecords('media'),query=mediaQuery.toLowerCase().trim();
+ var items=all.slice().filter(function(m){
+  var usage=mediaPostUsage(m.id);
+  var matched=!query||[m.name,m.altText,m.source,m.createdAt].join(' ').toLowerCase().includes(query);
+  return matched&&(mediaFilter==='all'||(mediaFilter==='used'&&usage.active.length>0)||
+   (mediaFilter==='unused'&&usage.active.length===0&&usage.recoverable===0)||
+   (mediaFilter==='needs-alt'&&!String(m.altText||'').trim()));
+ }).sort(function(a,b){return (b.createdAt||'').localeCompare(a.createdAt||'')});
+ var used=all.filter(function(m){return mediaPostUsage(m.id).active.length>0}).length;
+ return '<div class="panel hero"><h3>Media library · '+esc(profileName())+'</h3><p>Private encrypted pictures saved to this device. Find artwork, edit descriptions and see which posts use it. Maximum 8 MB per image.</p><strong>'+all.length+' pictures · '+used+' in posts</strong></div>'
+  +'<div class="panel upload-zone" id="media-drop"><h3>▧ Add images</h3><p>PNG, JPEG or WebP. Repeat files in this profile are recognised when their checksums are available. Drag and drop here, or choose files.</p><label class="btn primary">Upload images<input id="library-image-upload" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden></label></div>'
+  +'<div class="panel"><h3>Find your artwork</h3><div class="post-tools"><label>Search filename or description<input id="hq-media-search" aria-label="Search media" value="'+esc(mediaQuery)+'" placeholder="Search pictures"></label>'
+  +'<label>Show<select id="hq-media-filter"><option value="all" '+(mediaFilter==='all'?'selected':'')+'>All pictures</option><option value="used" '+(mediaFilter==='used'?'selected':'')+'>Used in posts</option><option value="unused" '+(mediaFilter==='unused'?'selected':'')+'>Not used</option><option value="needs-alt" '+(mediaFilter==='needs-alt'?'selected':'')+'>Needs description</option></select></label></div><p role="status" class="muted">Showing '+items.length+' of '+all.length+' pictures in '+esc(profileName())+'.</p></div>'
+  +'<div class="panel"><h3>My images</h3><div class="tile-grid">'+(items.length?items.map(function(m){
+   var usage=mediaPostUsage(m.id),count=usage.active.length;
+   var usageInfo=count?count+' post'+(count===1?'':'s')+' using this':usage.recoverable?'Only in recycle bin':'Not used in a post';
+   return '<div class="media-tile"><img data-hq-media="'+esc(m.id)+'" alt="'+esc(m.altText||m.name)+'"><small title="'+esc(m.name)+'">'+esc(m.name)+'</small><small>'+Math.max(1,Math.round((m.size||0)/1024))+' KB · '+esc(usageInfo)+'</small>'
+   +(m.altText?'<small title="'+esc(m.altText)+'">'+esc(m.altText)+'</small>':'<small class="danger-text">Description missing</small>')
+   +(count?'<details><summary>Used in '+count+' post'+(count===1?'':'s')+'</summary>'+usage.active.map(function(p){return '<p><button type="button" class="btn" data-open-post-from-media="'+esc(p.id)+'">'+esc(p.title||'Untitled post')+'</button></p>'}).join('')+'</details>':'')
+   +'<div class="actions"><button class="btn" data-edit-media-description="'+esc(m.id)+'">Edit description</button><button class="btn" data-use-media="'+esc(m.id)+'">New post</button><button class="btn" data-export-media="'+esc(m.id)+'">Save copy</button><button class="btn danger" data-trash-media="'+esc(m.id)+'" '+(count||usage.recoverable?'disabled title="Used by a saved or recoverable post"':'')+'>Bin</button></div></div>';
+  }).join(''):'<p>No matching pictures. Try clearing the search or change the filter.</p>')+'</div></div>';
 }
 async function addMediaFiles(files,attach){
  var list=Array.from(files||[]);
