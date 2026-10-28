@@ -62,3 +62,40 @@ This version adds:
 ## Manual Buffer publishing shortcut
 
 The Accounts screen now links directly to the official Buffer publishing dashboard. Every saved post also has a Buffer shortcut alongside its existing Copy caption action. This allows the user to paste manually reviewed captions into Buffer once they have created their official L-I-F-E social accounts and connected them there. It is **not a connection**, does not transmit any draft automatically, and does not synchronize posting status. The same manual workflow remains available for features the eventual API does not support. Do not copy unreleased venue details or unapproved paid ticket information.
+
+
+## Profile-specific post and image imports
+
+The Posts page offers a separate importer under the selected **L-I-F-E**, **Bears Adventures**, or any user-created profile. Its packages are **not** the legacy L-I-F-E seven-day countdown ZIPs; that existing importer remains unchanged and L-I-F-E-only.
+
+A profile package is a ZIP using the **Store / no compression** method. It contains a file called exactly \`HQ-PROFILE-POSTS.json\` and **one to seven uniquely named PNG images**, with one separate PNG per post. Alternatively, choose the extracted JSON and PNG files together using the second picker. The ZIP is checked locally (CRC-32, safe file names, no duplicate entries, size/format limits), with no upload to an external service.
+
+The selected profile ID is shown on **Manage profiles**. The JSON profileId must match it exactly. The app provides a **Download example manifest** action with the current profile ID prefilled. An example of the expected manifest:
+
+\`\`\`json
+{
+  "packageType": "LIFE-HQ-profile-drafts",
+  "version": 1,
+  "profileId": "bears-adventures",
+  "posts": [
+    {
+      "title": "Bear explores the garden",
+      "caption": "An afternoon adventure in the garden!",
+      "date": "2026-11-14",
+      "time": "12:00",
+      "assetRef": "garden.png",
+      "altText": "A teddy bear sitting on grass in the garden",
+      "networks": ["Instagram"],
+      "platformCaptions": {
+        "Instagram": "An afternoon adventure in the garden! 🐻"
+      }
+    }
+  ]
+}
+\`\`\`
+
+Include a real image named \`garden.png\` alongside this JSON. Dates can be omitted or set to an empty string if not yet planned. The allowed network names are Facebook, Instagram, TikTok, LinkedIn, Threads, YouTube and Pinterest. Image posts require a descriptive altText. The app does not assume those networks are connected.
+
+**Safety and recoverability:** The import is always **Draft** and never publishes, schedules or transfers content. It never overwrites earlier posts or approved work. The selected profile must match. Exact repeat packages (same manifest and image contents) are rejected to avoid duplicates; a changed picture produces a new package fingerprint. Every import makes an encrypted local recovery point before changing the workspace. The recovery screen can reverse that **profile's still-unapproved imported drafts only**, preserving other posts and profiles. Imported artwork stays in the private Media library for safety. A maximum of three new dated recovery snapshots are retained; older pre-update recovery points remain accessible with extra whole-workspace warnings. Always keep a separate **complete encrypted backup including images** before major edits or changing iPhone installation.
+
+No Instagram, Facebook or Buffer integration is activated by saving account handles or importing a profile ZIP. The Buffer handoff is still manual through iPhone sharing and requires user verification on the real destination.
