@@ -1,7 +1,7 @@
 /* L-I-F-E Social Media HQ PWA: cache the PUBLIC app shell only.
    Never cache encrypted workspace data, uploads, API responses or URLs outside /admin/. */
 'use strict';
-const CACHE_NAME='life-hq-static-v16';
+const CACHE_NAME='life-hq-static-v17';
 const SHELL=['/admin/','/admin/manifest.webmanifest','/admin/app-icon.svg','/admin/apple-touch-icon.png'];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
