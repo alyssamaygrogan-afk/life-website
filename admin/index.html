@@ -1421,6 +1421,154 @@ q('#body').addEventListener('change',function(e){
  if(e.target.dataset.selectPost){if(e.target.checked)selectedPostIds.add(e.target.dataset.selectPost);else selectedPostIds.delete(e.target.dataset.selectPost)}
 });
 
+
+/* Shortcuts are local workflow records, not external Buffer publishing. */
+var shortcutBusy=false;
+function selectedRecords(){return Array.from(selectedPostIds).map(function(pid){return data.posts.find(function(p){return p.id===pid})}).filter(Boolean)}
+function visibleRecords(){var query=postQuery.trim().toLowerCase();return data.posts.filter(function(p){return (postFilter==='all'||p.status===postFilter)&&(!query||[p.title,p.caption,p.date,(p.networks||[]).join(' '),p.topic].join(' ').toLowerCase().includes(query))})}
+function updateSelectedLabel(){var label=q('#post-selected-count');if(label)label.textContent=selectedPostIds.size+' selected';var box=q('#select-visible-posts'),rows=visibleRecords();if(box){box.checked=rows.length>0&&rows.every(function(p){return selectedPostIds.has(p.id)});box.indeterminate=!box.checked&&rows.some(function(p){return selectedPostIds.has(p.id)})}}
+function readyIssues(post){
+ var issues=releaseChecks(Object.assign({},post,{status:'Ready'}),true,false);
+ if(!String(post.title||'').trim()||!String(post.caption||'').trim())issues.push('The title and main caption are required');
+ if(['Image','Carousel'].includes(post.format)){
+  var refs=Array.isArray(post.mediaRefs)&&post.mediaRefs.length?post.mediaRefs:(String(post.assetRef||'').startsWith('localmedia:')?[post.assetRef]:[]);
+  if(!refs.length||refs.some(function(r){return typeof r!=='string'||!r.startsWith('localmedia:')}))issues.push('Attach the real HQ artwork, not a filename');
+  if(post.format==='Carousel'&&refs.length<2)issues.push('Add at least two carousel images');
+ }
+ if(['Published','Scheduled manually'].includes(post.status))issues.push('An already externally recorded post needs editing, not re-verifying as Ready');
+ return issues;
+}
+async function changePosts(posts,mutate,message){
+ if(shortcutBusy)return info('Another post update is being saved');
+ if(!posts.length)return info('Select at least one post');
+ shortcutBusy=true;var before=posts.map(function(p){return {id:p.id,record:structuredClone(p)}});
+ try{
+  posts.forEach(mutate);validateWorkspace(data);
+  if(!await save({skipRender:true}))throw Error('Encrypted device storage could not save');
+  render();info(message);
+ }catch(err){
+  before.forEach(function(o){var i=data.posts.findIndex(function(p){return p.id===o.id});if(i>=0)data.posts[i]=o.record});
+  render();info('Changes not saved: '+err.message);
+ }finally{shortcutBusy=false}
+}
+function reviewDialog(posts){
+ return new Promise(function(resolve){
+  var d=document.createElement('dialog');d.className='hq-review-dialog';
+  d.setAttribute('aria-label','Review and verify posts');
+  d.innerHTML='<h2>Verify '+posts.length+' post'+(posts.length===1?'':'s')+'</h2><p>Read the whole caption and check artwork, permission and release dates. This saves approval only in HQ; it does not publish.</p>'
+   +posts.map(function(p){
+    var refs=Array.isArray(p.mediaRefs)&&p.mediaRefs.length?p.mediaRefs:(String(p.assetRef||'').startsWith('localmedia:')?[p.assetRef]:[]);
+    return '<div class="review-entry"><h3>'+esc(p.title)+'</h3><p class="muted">'+esc(p.date||'Undated')+' · '+esc((p.networks||[]).join(', '))+'</p><p>'+esc(p.caption)+'</p>'
+    +(refs.length?'<div class="actions">'+refs.map(function(ref){return '<img data-hq-media="'+esc(ref.slice(11))+'" alt="'+esc(p.altText||'Attached artwork')+'">'}).join('')+'</div>':'')
+    +'<p class="muted">Image description: '+esc(p.altText||'None')+'</p></div>';
+   }).join('')
+   +'<label class="setup-check"><input type="checkbox" data-consent-review> I have checked every post, its facts, image(s), permissions, linked accounts and release timing.</label>'
+   +'<div class="actions"><button class="btn primary" type="button" data-confirm-review disabled>Verify and mark Ready</button><button class="btn" type="button" data-cancel-review>Cancel</button></div>';
+  document.body.appendChild(d);
+  var accept=d.querySelector('[data-confirm-review]');
+  d.querySelector('[data-consent-review]').addEventListener('change',function(e){accept.disabled=!e.target.checked});
+  function finish(v){if(d.open)d.close();d.remove();resolve(v)}
+  accept.addEventListener('click',function(){finish(true)});
+  d.querySelector('[data-cancel-review]').addEventListener('click',function(){finish(false)});
+  d.addEventListener('cancel',function(e){e.preventDefault();finish(false)});
+  if(typeof d.showModal==='function')d.showModal();else d.setAttribute('open','');
+  showMediaPreviews();
+ });
+}
+async function verifyRecords(posts){
+ if(!posts.length)return info('Select posts first');
+ var problems=[];posts.forEach(function(p){readyIssues(p).forEach(function(x){problems.push(p.title+': '+x)})});
+ if(problems.length){alert('These posts need changes before approval:\n\n'+problems.slice(0,12).join('\n'));return}
+ if(!await reviewDialog(posts))return;
+ var reviewedAt=new Date().toISOString();
+ await changePosts(posts,function(p){p.status='Ready';p.reviewed=true;p.reviewedAt=reviewedAt},posts.length+' reviewed post(s) marked Ready (not published)');
+}
+function requestPublishedUrl(post){
+ return new Promise(function(resolve){
+  var d=document.createElement('dialog');d.className='hq-review-dialog';
+  d.innerHTML='<h2>Record a post already published</h2><p><strong>'+esc(post.title)+'</strong></p><p>This does not publish anything. Only use this after checking the real post on the official L-I-F-E account. One URL records one actual publication, not every platform.</p>'
+   +'<label class="field">Public post URL<input type="url" placeholder="https://..." data-pub-url></label><label class="setup-check"><input type="checkbox" data-pub-confirm> I have personally checked the post is live on the correct account.</label>'
+   +'<p class="danger-text" data-pub-error role="alert"></p><div class="actions"><button class="btn primary" type="button" data-pub-save>Record as Published</button><button class="btn" type="button" data-pub-cancel>Cancel</button></div>';
+  document.body.appendChild(d);
+  function done(v){if(d.open)d.close();d.remove();resolve(v)}
+  d.querySelector('[data-pub-cancel]').addEventListener('click',function(){done(null)});
+  d.addEventListener('cancel',function(e){e.preventDefault();done(null)});
+  d.querySelector('[data-pub-save]').addEventListener('click',function(){
+   var url=d.querySelector('[data-pub-url]').value.trim();
+   if(!url||!safeUrl(url)||!d.querySelector('[data-pub-confirm]').checked){d.querySelector('[data-pub-error]').textContent='Enter the real https:// public link and confirm it is live.';return}
+   done(url);
+  });
+  if(typeof d.showModal==='function')d.showModal();else d.setAttribute('open','');
+ });
+}
+async function recordPublished(post){
+ if(post.reviewed!==true||!['Ready','Scheduled manually'].includes(post.status))return info('Verify and mark Ready before recording publication');
+ var url=await requestPublishedUrl(post);
+ if(!url)return;
+ var errors=releaseChecks(Object.assign({},post,{status:'Published',publishedUrl:url}),true,true);
+ if(errors.length)return info('Cannot record publication: '+errors[0]);
+ await changePosts([post],function(p){p.status='Published';p.publishedUrl=url;p.publishedExternallyAt=new Date().toISOString()},'Marked Published in HQ only. Nothing was sent from HQ.');
+}
+async function changeOneStatus(post,next){
+ if(!POST_STATUSES.includes(next)||next===post.status)return;
+ if(next==='Ready')return verifyRecords([post]);
+ if(next==='Published')return recordPublished(post);
+ if(post.status==='Published')return info('Use the full editor for already-published history');
+ if(next==='Scheduled manually'){
+  if(post.reviewed!==true||post.status!=='Ready')return info('Verify and mark Ready before recording external scheduling');
+  if(!await confirmHQ('Have you already scheduled '+post.title+' on an actual L-I-F-E social account? HQ cannot schedule it.','Confirm external scheduling'))return;
+  return changePosts([post],function(p){p.status='Scheduled manually'},'External scheduling recorded in HQ');
+ }
+ if(!await confirmHQ('Set '+post.title+' to '+next+' and clear its local approval? This will not undo anything in Buffer.','Change HQ status'))return;
+ return changePosts([post],function(p){p.status=next;p.reviewed=false;p.reviewedAt=''},'Local status updated to '+next);
+}
+function showBulkBuffer(posts){
+ var d=document.createElement('dialog');d.className='hq-review-dialog';
+ d.innerHTML='<h2>Share selected posts with Buffer</h2><p>Choose one at a time; the iPhone share sheet opens for that post. Nothing is automatically submitted, scheduled or published.</p>'
+ +posts.map(function(p){var ready=p.status==='Ready'&&p.reviewed===true&&readyIssues(p).length===0;
+  return '<div class="review-entry"><strong>'+esc(p.title)+'</strong><p class="muted">'+esc(p.date||'Undated')+' · '+esc(p.status)+'</p><button type="button" class="btn '+(ready?'primary':'')+'" data-share-from-batch="'+esc(p.id)+'" '+(ready?'':'disabled')+'>'+(ready?'Share this post':'Verify first')+'</button></div>'}).join('')
+ +'<button type="button" class="btn" data-close-batch>Close</button>';
+ document.body.appendChild(d);
+ function close(){if(d.open)d.close();d.remove()}
+ d.querySelector('[data-close-batch]').addEventListener('click',close);
+ d.addEventListener('cancel',function(e){e.preventDefault();close()});
+ d.querySelectorAll('[data-share-from-batch]').forEach(function(b){b.addEventListener('click',function(){var id=b.dataset.shareFromBatch;close();handoffToBuffer(id).catch(function(e){info(e.message)})})});
+ if(typeof d.showModal==='function')d.showModal();else d.setAttribute('open','');
+}
+async function applySelectedAction(){
+ var op=q('#bulk-post-operation')?.value,posts=selectedRecords();
+ if(!op)return info('Select an action from the dropdown');
+ if(!posts.length)return info('Select one or more posts first');
+ if(op==='handoff')return showBulkBuffer(posts);
+ if(op==='Ready')return verifyRecords(posts);
+ if(posts.some(function(p){return p.status==='Published'}))return info('Bulk changes cannot overwrite published records');
+ if(op==='Scheduled manually'){
+  if(posts.some(function(p){return p.reviewed!==true||!['Ready','Scheduled manually'].includes(p.status)}))return info('Verify all selected posts before recording scheduling');
+  if(!await confirmHQ('Have you already scheduled all '+posts.length+' posts outside HQ? This option does not schedule them.','Confirm external scheduling'))return;
+  return changePosts(posts,function(p){p.status=op},posts.length+' external schedules recorded');
+ }
+ if(!['Draft','Needs review'].includes(op))return;
+ if(!await confirmHQ('Set '+posts.length+' posts to '+op+' and clear their local approvals? Nothing will be sent to Buffer.','Change selected statuses'))return;
+ return changePosts(posts,function(p){p.status=op;p.reviewed=false;p.reviewedAt=''},posts.length+' statuses changed to '+op);
+}
+q('#body').addEventListener('click',function(e){
+ var b=e.target.closest('button');if(!b||!data)return;
+ if(b.dataset.postVerify){var p=data.posts.find(function(x){return x.id===b.dataset.postVerify});if(p)verifyRecords([p]).catch(function(err){info(err.message)});return}
+ if(b.dataset.postRecordPublished){var p=data.posts.find(function(x){return x.id===b.dataset.postRecordPublished});if(p)recordPublished(p).catch(function(err){info(err.message)});return}
+ if(b.dataset.action==='applybulkposts'){applySelectedAction().catch(function(err){info(err.message)});return}
+ if(b.dataset.action==='clearselection'){selectedPostIds.clear();render();return}
+});
+q('#body').addEventListener('change',function(e){
+ var el=e.target;
+ if(el.dataset.selectPost){updateSelectedLabel();return}
+ if(el.id==='select-visible-posts'){visibleRecords().forEach(function(p){if(el.checked)selectedPostIds.add(p.id);else selectedPostIds.delete(p.id)});render();return}
+ if(el.dataset.postQuickStatus){
+  var post=data.posts.find(function(p){return p.id===el.dataset.postQuickStatus});
+  if(!post)return;var next=el.value;el.value=post.status;
+  changeOneStatus(post,next).catch(function(err){info(err.message)});
+ }
+});
+
 /* Remembered access is optional, same-origin and same-device only:
    the AES CryptoKey is nonextractable; no password is stored in cleartext. */
 async function trustedDb(){
