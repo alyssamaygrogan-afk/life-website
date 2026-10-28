@@ -1119,8 +1119,10 @@ q('#body').addEventListener('change',async function(e){
    if(notice)notice.textContent='Unpacking and verifying the seven images on this phone…';
    files=await unpackLifeHQZip(files[0]);
   }
-  await importWeekPackage(files);
-  if(notice&&notice.isConnected){notice.textContent='Seven illustrated drafts imported. Review them in Posts.';notice.style.color='#22695f'}
+  var imported=await importWeekPackage(files);
+  if(imported===true){
+   if(notice&&notice.isConnected){notice.textContent='Seven illustrated drafts imported. Review them in Posts.';notice.style.color='#22695f'}
+  }else if(notice&&notice.isConnected){notice.textContent='Import cancelled — no posts or images were changed.';notice.style.color='#526778'}
  }catch(err){
   if(notice&&notice.isConnected){notice.textContent='Import could not finish: '+err.message;notice.style.color='#922d37'}
   info('Import was not completed. Previous drafts were kept.');
@@ -1279,7 +1281,7 @@ async function importWeekPackage(fileList){
   replacements.push({profileId:'life',id:'life-package-'+date+'-'+id().slice(0,8),weeklyKey:p.weeklyKey,title:p.title,date:p.date,time:'',status:'Draft',caption:p.caption,topic:p.topic||'General',format:'Image',networks:['Facebook','Instagram','TikTok','LinkedIn'],assetRef:'localmedia:'+newMediaId,mediaRefs:['localmedia:'+newMediaId],altText:p.altText,platformCaptions:p.platformCaptions,reviewed:false,reviewedAt:'',notes:'Weekly image package — approval needed'});
  }
   var oldDrafts=profileRecords('posts').filter(function(p){return p.status==='Draft'&&expected.includes(p.date)&&p.weeklyKey==='LIFE-WEEK-'+p.date});
-  if(!await confirmHQ('Import seven posts dated '+expected[0]+' to '+expected[6]+'? '+oldDrafts.length+' existing unapproved weekly drafts will go to the Recycle Bin. Other drafts, approved posts and campaigns stay unchanged; encrypted recovery is saved first. Nothing is published.','Import seven drafts'))return;
+  if(!await confirmHQ('Import seven posts dated '+expected[0]+' to '+expected[6]+'? '+oldDrafts.length+' existing unapproved weekly drafts will go to the Recycle Bin. Other drafts, approved posts and campaigns stay unchanged; encrypted recovery is saved first. Nothing is published.','Import seven drafts'))return false;
  // Automatic file downloads open a JSON preview in iPhone in-app browsers.
  // Use an encrypted IndexedDB recovery point instead of triggering a download.
  try{await savePreImportRecovery()}
@@ -1300,6 +1302,7 @@ async function importWeekPackage(fileList){
   if(!await save({skipRender:true}))throw Error('Could not save the encrypted replacement drafts');
   navigate('posts');
   info('Seven illustrated L-I-F-E drafts imported successfully. Nothing published.');
+  return true;
  }catch(err){
   // Roll back the entire import, including new artwork, so retries are safe.
   data.posts=originalPosts;data.media=originalMedia;data.trash=originalTrash;
