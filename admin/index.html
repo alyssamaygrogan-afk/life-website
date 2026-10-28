@@ -204,9 +204,26 @@ html,body,#app,#app main,#app .body{max-width:100%;min-width:0}
  #hq-manage-profiles{flex:1 1 auto}
 }
 body[data-hq-profile]:not([data-hq-profile="life"]) [data-life-only]{display:none!important}
+
+/* Compact iPhone navigation: four essential tabs and a discoverable More menu. */
+#hq-more-nav{display:none}
+.hq-more-menu{box-sizing:border-box;width:calc(100% - 26px);max-width:430px;max-height:84dvh;overflow:auto;border:0;border-radius:15px;background:#fff;padding:18px;color:#18243b;box-shadow:0 18px 65px #0006}
+.hq-more-menu .hq-more-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.hq-more-menu button{white-space:normal;min-width:0}
+@media(max-width:700px){
+ #app aside{gap:4px;display:flex;align-items:center}
+ #app aside nav{min-width:0;flex:1 1 auto;justify-content:space-around;gap:2px;overflow:visible}
+ #app aside nav button[data-page]{display:none}
+ #app aside nav button[data-page="home"],
+ #app aside nav button[data-page="posts"],
+ #app aside nav button[data-page="calendar"],
+ #app aside nav button[data-page="media"]{display:block;flex:1 1 0;min-width:0;max-width:none;font-size:10px;padding:9px 2px;line-height:1.25;white-space:normal}
+ #app aside #hq-more-nav{display:block;width:62px;flex:0 0 62px;min-width:0;max-width:none;text-align:center;font-size:11px;white-space:normal;padding:10px 2px}
+ #app aside #hq-more-nav.active{background:#30445e;color:#fff}
+}
 </style></head><body>
 <section id="signin" class="auth"><div class="authbox"><div class="logo">L-I-F-E</div><h1>Social Media HQ</h1><p class="muted">Private planning workspace for the 30 January 2027 launch in Milton Keynes.</p><form id="authform"><label class="field">Workspace email label (not Google sign-in)<input id="email" type="email" value="alyssa-may.grogan@lifeinfullecosystem.org" autocomplete="username" required></label><label class="field">Device workspace password<input id="password" type="password" minlength="12" autocomplete="current-password" required></label><label class="setup-check"><input id="trustdevice" type="checkbox"> Keep me signed in on this trusted device for 30 days</label><button id="unlock" class="btn primary">Login</button><p id="autherror" class="error" role="alert"></p></form><button id="quickunlock" class="btn hidden" type="button">Continue on this device</button><button id="forgetdevice" class="btn danger hidden" type="button">Forget this device</button><p class="muted">First login on this browser: choose a private workspace password (12+ characters). Your browser password manager may save it. Trusted-device access is optional; anyone using this browser profile could open your local drafts.</p><div class="warn"><strong>Encrypted private workspace.</strong> Your content stays on this device unless you export an encrypted backup. This is not Google sign-in or cross-device syncing; social publishing and spending are not connected.</div><div id="iphone-app-install" class="pwa-install-card" hidden><div class="pwa-install-heading">📱 Install L-I-F-E HQ on your iPhone</div><p>First, log in here and choose <strong>Backup → Download complete encrypted backup</strong> to protect any existing posts and pictures.</p><p>Then open this page in <strong>Safari</strong>, tap <strong>Share → Add to Home Screen</strong>, turn on <strong>Open as Web App</strong>, and tap <strong>Add</strong>.</p><p class="muted">The Home Screen app can have separate private storage. If it starts empty, restore your complete encrypted backup inside the installed app.</p></div><p class="muted"><a class="link" href="/">← Return to L-I-F-E website</a></p></div></section>
-<div id="app" class="hidden"><aside><div class="brand"><div class="logo">L-I-F-E</div><p>SOCIAL MEDIA HQ</p></div><nav id="nav"><button data-page="home">⌂ Overview</button><button data-page="posts">✎ Posts</button><button data-page="media">▧ Media</button><button data-page="trash">♻ Recycle Bin</button><button data-page="calendar">▦ Calendar</button><button data-page="brand" data-life-only>✦ Brand Studio</button><button data-page="campaigns" data-life-only>Campaigns</button><button data-page="reports">Reports</button><button data-page="contacts" data-life-only>Outreach</button><button data-page="connections">Accounts</button><button data-page="settings">Backup</button></nav></aside><main><header><div><small id="hq-profile-context" class="muted">Social Media HQ • Current profile</small><h2 id="heading">Overview</h2></div><div class="toolbar-row"><label class="hq-profile-switch" for="hq-profile-select">Profile<select id="hq-profile-select" aria-label="Choose Social Media HQ profile"></select></label><button id="hq-manage-profiles" class="btn" type="button">Manage profiles</button><button class="btn hq-sidebar-toggle" id="toggle-sidebar" type="button" aria-label="Collapse or expand navigation" aria-expanded="true">☰</button><button class="btn" id="lock" type="button">Lock</button><button class="btn danger" id="logout" type="button">Log out</button></div></header><div id="body" class="body"></div></main></div><div id="status" class="hidden" role="status"></div>
+<div id="app" class="hidden"><aside><div class="brand"><div class="logo">L-I-F-E</div><p>SOCIAL MEDIA HQ</p></div><nav id="nav"><button data-page="home">⌂ Overview</button><button data-page="posts">✎ Posts</button><button data-page="media">▧ Media</button><button data-page="trash">♻ Recycle Bin</button><button data-page="calendar">▦ Calendar</button><button data-page="brand" data-life-only>✦ Brand Studio</button><button data-page="campaigns" data-life-only>Campaigns</button><button data-page="reports">Reports</button><button data-page="contacts" data-life-only>Outreach</button><button data-page="connections">Accounts</button><button data-page="settings">Backup</button></nav><button id="hq-more-nav" type="button" aria-haspopup="dialog">☰ More</button></aside><main><header><div><small id="hq-profile-context" class="muted">Social Media HQ • Current profile</small><h2 id="heading">Overview</h2></div><div class="toolbar-row"><label class="hq-profile-switch" for="hq-profile-select">Profile<select id="hq-profile-select" aria-label="Choose Social Media HQ profile"></select></label><button id="hq-manage-profiles" class="btn" type="button">Manage profiles</button><button class="btn hq-sidebar-toggle" id="toggle-sidebar" type="button" aria-label="Collapse or expand navigation" aria-expanded="true">☰</button><button class="btn" id="lock" type="button">Lock</button><button class="btn danger" id="logout" type="button">Log out</button></div></header><div id="body" class="body"></div></main></div><div id="status" class="hidden" role="status"></div>
 <script>
 (function(){
 'use strict';
@@ -389,8 +406,26 @@ q('#authform').addEventListener('submit',async function(e){
  }catch(err){key=null;data=null;q('#autherror').textContent='Unable to log in. Check your password or restore an encrypted backup.'}
  finally{q('#unlock').disabled=false}
 });
-function navigate(s){if(activeProfileId!=='life'&&['brand','campaigns','contacts','contact','ad'].includes(s))s='home';if(s==='connections'&&activeProfileId!=='life')s='profiles';section=s;renderProfileSwitcher();q('#heading').textContent={home:'Campaign overview',posts:'Posts & drafts',post:'Post editor',media:'Media library',trash:'Recycle bin',brand:'Brand Studio',calendar:'Publishing calendar',contacts:'Press & invitations',contact:'Contact editor',campaigns:'Campaigns & advertising',ad:'Advertising plan',reports:'Manual performance report',connections:'Connected accounts setup',profiles:'Profiles & accounts',settings:'Backups & privacy'}[s]||'Social Media HQ';document.querySelectorAll('#nav button').forEach(function(b){b.classList.toggle('active',b.dataset.page===s)});if(s==='post'){var selected=data.posts.find(function(p){return p.id===editing});draftMediaRefs=(selected&&Array.isArray(selected.mediaRefs)?selected.mediaRefs:(selected&&String(selected.assetRef||'').startsWith('localmedia:')?[selected.assetRef]:[])).slice();activeCaptionPlatform='Facebook'}render()}
+function navigate(s){if(q('#hq-more-nav'))q('#hq-more-nav').classList.toggle('active',!['home','posts','calendar','media'].includes(s));if(activeProfileId!=='life'&&['brand','campaigns','contacts','contact','ad'].includes(s))s='home';if(s==='connections'&&activeProfileId!=='life')s='profiles';section=s;renderProfileSwitcher();q('#heading').textContent={home:'Campaign overview',posts:'Posts & drafts',post:'Post editor',media:'Media library',trash:'Recycle bin',brand:'Brand Studio',calendar:'Publishing calendar',contacts:'Press & invitations',contact:'Contact editor',campaigns:'Campaigns & advertising',ad:'Advertising plan',reports:'Manual performance report',connections:'Connected accounts setup',profiles:'Profiles & accounts',settings:'Backups & privacy'}[s]||'Social Media HQ';document.querySelectorAll('#nav button').forEach(function(b){b.classList.toggle('active',b.dataset.page===s)});if(s==='post'){var selected=data.posts.find(function(p){return p.id===editing});draftMediaRefs=(selected&&Array.isArray(selected.mediaRefs)?selected.mediaRefs:(selected&&String(selected.assetRef||'').startsWith('localmedia:')?[selected.assetRef]:[])).slice();activeCaptionPlatform='Facebook'}render()}
 q('#nav').addEventListener('click',function(e){var b=e.target.closest('[data-page]');if(b)navigate(b.dataset.page)});
+
+q('#hq-more-nav').addEventListener('click',function(){
+ if(!data)return;
+ var links=Array.from(q('#nav').querySelectorAll('button[data-page]'))
+  .filter(function(b){return !['home','posts','calendar','media'].includes(b.dataset.page)&&!(activeProfileId!=='life'&&b.hasAttribute('data-life-only'))});
+ var dlg=document.createElement('dialog');dlg.className='hq-more-menu';dlg.setAttribute('aria-label','More Social Media HQ sections');
+ dlg.innerHTML='<h3>More sections</h3><p class="muted">Choose a section for '+esc(profileName())+'.</p><div class="hq-more-links">'
+  +links.map(function(b){return '<button class="btn" type="button" data-more-page="'+esc(b.dataset.page)+'">'+esc(b.textContent)+'</button>'}).join('')
+  +'<button class="btn" type="button" data-more-page="profiles">Profiles & accounts</button></div><div class="actions" style="margin-top:12px"><button class="btn" type="button" data-more-close>Close</button></div>';
+ document.body.appendChild(dlg);var origin=q('#hq-more-nav');
+ function close(){if(dlg.open)dlg.close();dlg.remove();if(origin)origin.focus()}
+ dlg.querySelector('[data-more-close]').addEventListener('click',close);
+ dlg.querySelectorAll('[data-more-page]').forEach(function(b){b.addEventListener('click',function(){var page=b.dataset.morePage;close();navigate(page)})});
+ dlg.addEventListener('cancel',function(e){e.preventDefault();close()});
+ if(typeof dlg.showModal==='function')dlg.showModal();else dlg.setAttribute('open','');
+ dlg.querySelector('[data-more-page]')?.focus();
+});
+
 function top(){
  if(activeProfileId!=='life'){
   var posts=profileRecords('posts'),assets=profileRecords('media');
