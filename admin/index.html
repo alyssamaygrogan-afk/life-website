@@ -986,6 +986,7 @@ async function handoffToBuffer(postId){
  dialog.innerHTML='<h3>Share '+esc(profileName())+' post to Buffer</h3><p><strong>'+esc(post.title)+'</strong></p><p class="muted">'+files.length+' attached image(s) · '+esc(post.date||'Unscheduled')+'</p>'
  +'<label class="field">Choose caption<select data-buffer-share-platform>'+platforms.map(function(p){return '<option>'+esc(p)+'</option>'}).join('')+'</select></label>'
  +'<p class="status-note">Select Buffer in the iPhone share sheet. Make sure you choose the correct '+esc(profileName())+' social account, then check the caption and every image before saving or scheduling in Buffer. This is NOT an automatic Buffer connection or confirmed transfer.</p>'
+ +'<label class="setup-check"><input data-buffer-account-ack type="checkbox"> I will check the selected account inside Buffer before saving or scheduling this post.</label>'
  +'<p class="muted" role="status" data-share-support></p><div class="actions"><button type="button" class="btn primary" data-share-press>Share via iPhone</button><button type="button" class="btn" data-share-copy>Copy caption</button><button type="button" class="btn" data-share-cancel>Close</button></div>'
  +(refs.length?'<p class="muted">If images do not arrive, save them here and attach in Buffer:</p><div class="actions">'+refs.map(function(ref,i){return '<button type="button" class="btn" data-save-buffer-image="'+i+'">Save image '+(i+1)+'</button>'}).join('')+'</div>':'')
  +'<p class="muted"><a href="https://publish.buffer.com/" target="_blank" rel="noopener noreferrer">Open Buffer manually</a> (this link cannot transfer a post).</p>';
@@ -1002,12 +1003,15 @@ async function handoffToBuffer(postId){
   b.addEventListener('click',function(){exportMedia(refs[Number(b.dataset.saveBufferImage)].slice(11)).catch(function(e){info(e.message)})});
  });
  var canShare=typeof navigator.share==='function'&&(!files.length||(typeof navigator.canShare==='function'&&navigator.canShare({files:files})));
+ var accountCheck=dialog.querySelector('[data-buffer-account-ack]'),shareButton=dialog.querySelector('[data-share-press]');
+ shareButton.disabled=true;
+ accountCheck.addEventListener('change',function(){shareButton.disabled=!canShare||!accountCheck.checked});
  if(!canShare){dialog.querySelector('[data-share-press]').disabled=true;dialog.querySelector('[data-share-support]').textContent='This device cannot hand off the attached artwork via the share sheet. Copy caption and save images to finish in Buffer.';}
  dialog.querySelector('[data-share-press]').addEventListener('click',function(){
   if(!canShare)return;
   var payload={title:profileName()+' · '+post.title,text:caption()};if(files.length)payload.files=files;
   /* Must invoke immediately in button click for Safari user activation. */
-  navigator.share(payload).then(function(){info('Shared to the chosen app. Check Buffer; HQ did not schedule it.');close()})
+  navigator.share(payload).then(function(){info('iPhone share sheet completed. Check the real Buffer draft or queue; HQ has no Buffer confirmation.');close()})
    .catch(function(e){if(e&&e.name!=='AbortError')info('Share failed: '+e.message)});
  });
  if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');
