@@ -1156,7 +1156,7 @@ async function unpackLifeHQZip(file,profilePack){
   var filename=decode(cursor+46,nameLen);
   if(seen.has(filename)||filename.indexOf('/')>=0||filename.indexOf('\\')>=0||!(profilePack?/^(HQ-PROFILE-POSTS\.json|[A-Za-z0-9_-]+\.png)$/:/^(LIFE-HQ-week-\d{4}-\d{2}-\d{2}\.json|[A-Za-z0-9_-]+\.png)$/).test(filename))throw Error('This ZIP has unexpected or duplicate files');
   seen.add(filename);
-  if(method!==0||sizeCompressed!==sizeRaw)throw Error('Use the new ZIP named L-I-F-E_HQ_UPLOAD_THIS. Older compressed ZIPs need extraction first');
+  if(method!==0||sizeCompressed!==sizeRaw)throw Error('This ZIP uses compression. Use an uncompressed (Store) ZIP, or choose the extracted JSON and PNG files together instead');
   if((flags&1)||sizeRaw>8000000)throw Error('An image is encrypted or too large');
   total+=sizeRaw;
   if(total>20000000)throw Error('The ZIP contains too much data');
