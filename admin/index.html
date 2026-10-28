@@ -268,7 +268,7 @@ async function switchProfile(next){
  if(['post','contact','ad'].includes(section)&&!await confirmHQ('Leave the current editor? Any unsaved changes will be lost.','Switch profile'))return;
  var old=activeProfileId;activeProfileId=next;data.activeProfileId=next;
  if(!await save({skipRender:true})){activeProfileId=old;data.activeProfileId=old;renderProfileSwitcher();return}
- selectedPostIds.clear();postFilter='all';postQuery='';mediaQuery='';mediaFilter='all';mediaLimit=48;applyBrand();
+ selectedPostIds.clear();postFilter='all';postQuery='';mediaQuery='';mediaFilter='all';mediaLimit=48;if(mediaSearchTimer)clearTimeout(mediaSearchTimer);mediaSearchTimer=null;applyBrand();
  editing=null;contactEditing=null;adEditing=null;draftMediaRefs=[];
  metaBridgeRuntime={pages:[],status:null,message:''};
  var allowed=['posts','media','calendar','trash','profiles','settings','home'];
@@ -1517,7 +1517,7 @@ function mediaComposer(){
  +'<div class="brand-rainbow"></div><h3>Make a branded square card</h3><label class="field">Card headline<input id="card-headline" maxlength="100" placeholder="e.g. 90 DAYS TO GO!"></label>'
  +'<button class="btn" type="button" data-action="makebrandcard" data-life-only>Generate branded 1080 × 1080 image</button></div>';
 }
-var mediaQuery='',mediaFilter='all',mediaLimit=48;
+var mediaQuery='',mediaFilter='all',mediaLimit=48,mediaSearchTimer=null;
 function mediaPostUsage(mediaId){
  var ref='localmedia:'+mediaId;
  var active=profileRecords('posts').filter(function(p){return postMediaRefs(p).includes(ref)});
@@ -1592,9 +1592,14 @@ q('#body').addEventListener('input',function(e){
  mediaQuery=String(e.target.value||'').slice(0,250);
  mediaLimit=48;
  var cursor=e.target.selectionStart;
- render();
- var input=q('#hq-media-search');
- if(input){input.focus({preventScroll:true});try{input.setSelectionRange(cursor,cursor)}catch(err){}}
+ if(mediaSearchTimer)clearTimeout(mediaSearchTimer);
+ mediaSearchTimer=setTimeout(function(){
+  mediaSearchTimer=null;
+  if(section!=='media')return;
+  render();
+  var input=q('#hq-media-search');
+  if(input){input.focus({preventScroll:true});try{input.setSelectionRange(cursor,cursor)}catch(err){}}
+ },180);
 });
 q('#body').addEventListener('change',function(e){
  if(e.target.id!=='hq-media-filter')return;
@@ -1640,7 +1645,7 @@ async function addMediaFiles(files,attach){
    if(form)form.dataset.hasUnsavedChanges='yes';
   }
   if(!await save(attach?{skipRender:true}:undefined))throw Error('Encrypted image metadata could not be saved on this device');
-  info(count+' image'+(count===1?'':'s')+' saved'+(reused?'; '+reused+' duplicate'+(reused===1?'':'s')+' reused without re-uploading':''));
+  info((count?count+' new image'+(count===1?'':'s')+' saved':'No new image stored')+(reused?'; '+reused+' existing picture'+(reused===1?'':'s')+' reused':'')+'.');
  }catch(err){
   data.media=oldMedia;draftMediaRefs=oldRefs;
   if(form&&oldFormat!==null&&form.elements.format)form.elements.format.value=oldFormat;
