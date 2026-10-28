@@ -268,7 +268,7 @@ async function switchProfile(next){
  if(['post','contact','ad'].includes(section)&&!await confirmHQ('Leave the current editor? Any unsaved changes will be lost.','Switch profile'))return;
  var old=activeProfileId;activeProfileId=next;data.activeProfileId=next;
  if(!await save({skipRender:true})){activeProfileId=old;data.activeProfileId=old;renderProfileSwitcher();return}
- selectedPostIds.clear();postFilter='all';postQuery='';
+ selectedPostIds.clear();postFilter='all';postQuery='';applyBrand();
  editing=null;contactEditing=null;adEditing=null;draftMediaRefs=[];
  metaBridgeRuntime={pages:[],status:null,message:''};
  var allowed=['posts','media','calendar','trash','profiles','settings','home'];
@@ -348,6 +348,11 @@ function validateWorkspace(d){
   for(var pr of d.profiles){
    if(!pr||!isText(pr.id,120)||!pr.id||!isText(pr.name,100)||!pr.name.trim()||seenProfiles.has(pr.id))throw Error('Invalid profile');
    seenProfiles.add(pr.id);
+   if(pr.brand!==undefined){
+    var pb=pr.brand;
+    if(!pb||typeof pb!=='object'||Array.isArray(pb)||!isText(pb.accent,7)||!/^#[0-9a-fA-F]{6}$/.test(pb.accent)||
+     !isText(pb.hashtags,500)||!isText(pb.voice,1500))throw Error('Invalid profile branding');
+   }
    if(pr.accounts!==undefined){
     if(!Array.isArray(pr.accounts)||pr.accounts.length>30)throw Error('Invalid account list');
     for(var a of pr.accounts)if(!a||!isText(a.service,80)||!isText(a.handle,160)||!isText(a.url,1000)||(a.url&&!safeUrl(a.url)))throw Error('Invalid profile account');
@@ -523,12 +528,15 @@ function posts(){
  return out;
 }
 function postForm(){
+ var style=activeProfile().brand||{},tokens=activeProfileId==='life'?
+  ['🌈','💜','✨','🌍','♾️','🤝','💛','🎉','#LIFE2027','#LivingINFull','#MiltonKeynes']:
+  ['✨','📸','🌿','🐾','💛','🎉'].concat(String(style.hashtags||'').split(/\s+/).filter(function(x){return x.startsWith('#')}).slice(0,8));
  var x=data.posts.find(function(p){return p.id===editing&&inProfile(p)})||{title:'',date:'',time:'12:00',status:'Draft',caption:'',networks:['Facebook','Instagram'],topic:'General',format:'Text'};
  var networks=Array.isArray(x.networks)?x.networks:[];
  return '<div class="panel"><h3>'+(editing?'Edit':'New')+' post</h3><p class="status-note">Use this editor to prepare content for '+esc(profileName())+' accounts. Approving saves only inside this device: nothing is sent to Buffer or published automatically.</p><form id="postform" class="twocol"><p class="full status-note" id="approval-persisted" role="status">'+(x.reviewed===true?'<strong>Review saved.</strong> This version was approved locally'+(x.reviewedAt?' on '+esc(new Date(x.reviewedAt).toLocaleString('en-GB')):'')+'. Any edit needs a fresh approval.':'<strong>Awaiting approval.</strong> Choose Ready, review all details, tick the confirmation and Save post.')+'</p><p class="form-error full hidden" id="postformtoperror" role="alert"></p><label class="field">Title<input name="title" required maxlength="120" value="'+esc(x.title)+'"></label><label class="field">Planned date<input type="date" name="date" value="'+esc(x.date||'')+'"></label><label class="field">UK time<input type="time" name="time" value="'+esc(x.time||'12:00')+'"></label><label class="field">Status<select name="status">'+POST_STATUSES.map(function(v){return '<option value="'+v+'" '+(v===x.status?'selected':'')+'>'+v+(v==='Published'?' (manual confirmation)':'')+'</option>'}).join('')+'</select></label>'
  +'<label class="field">Campaign topic<select name="topic">'+TOPICS.map(function(v){return '<option '+(v===(x.topic||'General')?'selected':'')+'>'+esc(v)+'</option>'}).join('')+'</select></label><label class="field">Content format<select name="format">'+FORMATS.map(function(v){return '<option '+(v===(x.format||'Text')?'selected':'')+'>'+v+'</option>'}).join('')+'</select></label>'
  +'<fieldset class="channels full"><legend>Intended social platforms — not connected</legend><div class="channel-options">'+CHANNELS.map(function(v){return '<label><input type="checkbox" name="networks" value="'+v+'" '+(networks.includes(v)?'checked':'')+'>'+v+'</label>'}).join('')+'</div></fieldset>'
- +'<div class="full"><h3>Platform captions</h3><p class="muted">Edit each platform separately. Nothing is published automatically.</p><div class="composer-tabs" role="tablist">'+['Facebook','Instagram','TikTok','LinkedIn'].map(function(n){return '<button type="button" data-caption-tab="'+n+'" class="'+(activeCaptionPlatform===n?'active':'')+'" aria-selected="'+String(activeCaptionPlatform===n)+'">'+n+'</button>'}).join('')+'</div><div class="emoji-toolbar" aria-label="Insert emoji or hashtag">'+['🌈','💜','✨','🌍','♾️','🤝','💛','🎉','#LIFE2027','#LivingINFull','#MiltonKeynes'].map(function(em){return '<button type="button" data-insert-text="'+esc(em)+'" aria-label="Insert '+esc(em)+'">'+esc(em)+'</button>'}).join('')+'</div></div>'
+ +'<div class="full"><h3>Platform captions</h3><p class="muted">Edit each platform separately. Nothing is published automatically.</p><div class="composer-tabs" role="tablist">'+['Facebook','Instagram','TikTok','LinkedIn'].map(function(n){return '<button type="button" data-caption-tab="'+n+'" class="'+(activeCaptionPlatform===n?'active':'')+'" aria-selected="'+String(activeCaptionPlatform===n)+'">'+n+'</button>'}).join('')+'</div><div class="emoji-toolbar" aria-label="Insert emoji or hashtag">'+tokens.map(function(em){return '<button type="button" data-insert-text="'+esc(em)+'" aria-label="Insert '+esc(em)+'">'+esc(em)+'</button>'}).join('')+'</div></div>'
  +'<div class="full" data-caption-pane="Facebook" '+(activeCaptionPlatform!=='Facebook'?'hidden':'')+'><label class="field">Facebook caption<textarea name="caption" maxlength="10000">'+esc(x.caption)+'</textarea></label></div>'
  +mediaComposer()+'<label class="field full">External image/video reference (optional)<input name="assetRef" maxlength="500" placeholder="Optional reference to externally stored content" value="'+esc(x.assetRef&&x.assetRef.startsWith('localmedia:')?'':x.assetRef||'')+'"></label>'
  +(x.assetRef&&x.assetRef.startsWith('localmedia:')?'<div class="full"><p>Artwork for this profile, stored privately on this device:</p><img data-hq-media="'+esc(x.assetRef.slice(11))+'" alt="'+esc(x.altText||'Image preview')+'" style="width:220px;max-width:100%;aspect-ratio:1;object-fit:contain;border-radius:10px;background:#000"></div>':'')+'<label class="field full">Accessible image description (alt text)<textarea name="altText" maxlength="2000" placeholder="Describe the image for screen reader users">'+esc(x.altText||'')+'</textarea></label>'+['Instagram','TikTok','LinkedIn'].map(function(n){return '<div class="full" data-caption-pane="'+n+'" '+(activeCaptionPlatform!==n?'hidden':'')+'><label class="field">'+n+' caption adaptation<textarea name="platform_'+n+'" maxlength="10000">'+esc((x.platformCaptions||{})[n]||'')+'</textarea></label></div>'}).join('')
@@ -764,10 +772,11 @@ function profilesPage(){
  return '<div class="panel hero"><h3>Profiles & accounts</h3><p>Choose the project using the top dropdown. Posts, pictures, calendar and reports stay separate.</p></div>'
  +'<div class="panel"><h3>Add another profile</h3><form id="new-profile-form"><label class="field">Profile name<input name="name" required maxlength="80" placeholder="New account or project"></label><button class="btn primary" type="submit">+ Add profile</button></form><p class="muted">New profiles stay inside the existing encrypted workspace. No external social accounts are connected automatically.</p></div>'
  +data.profiles.map(function(pr){
-  var accounts=pr.accounts||[];
+  var accounts=pr.accounts||[],brand=pr.brand||{},accent=/^#[0-9a-fA-F]{6}$/.test(brand.accent||'')?brand.accent:'#6354bb';
   return '<div class="panel hq-profile-card"><h3>'+esc(pr.name)+(pr.id===activeProfileId?' <span class="tag">Selected</span>':'')+'</h3><p class="muted">'+profileRecordsFor(pr.id,'posts').length+' posts · '+profileRecordsFor(pr.id,'media').length+' images</p>'
    +(pr.id===activeProfileId?'':'<button class="btn primary" type="button" data-open-profile="'+esc(pr.id)+'">Switch to profile</button>')
    +(pr.id==='life'?'<p class="muted">Existing L-I-F-E material remains here.</p>':'<form data-rename-profile="'+esc(pr.id)+'"><label class="field">Rename profile<input name="name" required maxlength="80" value="'+esc(pr.name)+'"></label><button class="btn" type="submit">Save name</button></form>')
+   +'<h3 style="margin-top:16px">Profile style & writing</h3><form data-profile-brand="'+esc(pr.id)+'"><label class="field">Accent colour<input name="accent" type="color" value="'+esc(accent)+'"></label><label class="field">Default hashtags<input name="hashtags" maxlength="500" placeholder="#YourProject" value="'+esc(brand.hashtags||'')+'"></label><label class="field">Tone of voice<textarea name="voice" maxlength="1500" placeholder="Friendly, welcoming, clear…">'+esc(brand.voice||'')+'</textarea></label><button class="btn" type="submit">Save profile style</button></form>'
    +'<h3 style="margin-top:16px">Social account references</h3><p class="muted">Saved for planning only. Not a live Buffer or social account connection.</p>'
    +(accounts.length?accounts.map(function(a,i){return '<div class="hq-profile-account"><strong>'+esc(a.service)+'</strong> · '+esc(a.handle)+(a.url&&safeUrl(a.url)?'<p><a class="link" href="'+esc(a.url)+'" target="_blank" rel="noopener noreferrer">Open profile</a></p>':'')+'<button type="button" class="btn danger" data-remove-account-from="'+esc(pr.id)+'" data-remove-account-number="'+i+'">Remove reference</button></div>'}).join(''):'<p class="muted">No accounts added yet.</p>')
    +'<form data-add-account-to="'+esc(pr.id)+'"><label class="field">Platform<select name="service">'+choices+'</select></label><label class="field">Account name / @handle<input name="handle" required maxlength="160"></label><label class="field">Public account URL (optional)<input name="url" type="url" maxlength="1000" placeholder="https://..."></label><button class="btn" type="submit">Add account reference</button></form></div>';
@@ -800,7 +809,7 @@ q('#body').addEventListener('click',async function(e){
  }catch(err){info('Profile update failed: '+err.message)}
 });
 q('#body').addEventListener('submit',async function(e){
- var form=e.target;if(form.id!=='new-profile-form'&&form.dataset.renameProfile===undefined&&form.dataset.addAccountTo===undefined)return;
+ var form=e.target;if(form.id!=='new-profile-form'&&form.dataset.renameProfile===undefined&&form.dataset.addAccountTo===undefined&&form.dataset.profileBrand===undefined)return;
  e.preventDefault();
  try{
   var fields=new FormData(form),name=String(fields.get('name')||'').trim();
@@ -811,8 +820,15 @@ q('#body').addEventListener('submit',async function(e){
    await persistProfileMutation(function(){data.profiles.push({id:nextId,name:name,accounts:[]})},'Profile added');
    await switchProfile(nextId);return;
   }
-  var pr=data.profiles.find(function(x){return x.id===(form.dataset.renameProfile!==undefined?form.dataset.renameProfile:form.dataset.addAccountTo)});
+  var pr=data.profiles.find(function(x){return x.id===(form.dataset.renameProfile!==undefined?form.dataset.renameProfile:form.dataset.profileBrand!==undefined?form.dataset.profileBrand:form.dataset.addAccountTo)});
   if(!pr)throw Error('Profile not found');
+  if(form.dataset.profileBrand!==undefined){
+   var accent=String(fields.get('accent')||''),hashtags=String(fields.get('hashtags')||'').trim(),voice=String(fields.get('voice')||'').trim();
+   if(!/^#[0-9a-fA-F]{6}$/.test(accent)||hashtags.length>500||voice.length>1500)throw Error('Invalid profile style');
+   await persistProfileMutation(function(){pr.brand={accent:accent,hashtags:hashtags,voice:voice}},'Profile style saved');
+   if(pr.id===activeProfileId)applyBrand();
+   return;
+  }
   if(form.dataset.renameProfile!==undefined){
    if(pr.id==='life'||!name||name.length>80||data.profiles.some(function(p){return p.id!==pr.id&&p.name.toLowerCase()===name.toLowerCase()}))throw Error('Use a different profile name');
    await persistProfileMutation(function(){pr.name=name},'Profile name updated');
@@ -2023,7 +2039,7 @@ checkTrustedDevice().then(async function(record){
  catch(err){await forgetThisDevice();q('#autherror').textContent='Trusted access expired. Log in with your password.'}
 }).catch(function(){});
 function applyBrand(){
- var b=data&&data.brand||{},fonts=['system','rounded','serif'];
+ var b=activeProfileId==='life'?(data&&data.brand||{}):(activeProfile().brand||{}),fonts=['system','rounded','serif'];
  var choice=fonts.includes(b.font)?b.font:'system';
  document.body.dataset.hqFont=choice;
  document.documentElement.style.setProperty('--hq-scale',String(Math.max(0.85,Math.min(1.3,Number(b.uiScale)||1))));
