@@ -1316,6 +1316,81 @@ function showMediaPreviews(){
   catch(err){if(el.isConnected)el.replaceWith(document.createTextNode('Artwork is not saved on this device. Import the matching image from the weekly package.'))}
  });
 }
+
+/* Universal image-and-caption draft pack. No publishing credentials or external calls. */
+async function importProfilePackage(fileList){
+ if(!data||!key||pendingSaves)throw Error('Unlock HQ and finish saving first');
+ var files=Array.from(fileList||[]),manifest=files.filter(function(f){return f.name==='HQ-PROFILE-POSTS.json'});
+ if(manifest.length!==1||files.length<2||files.length>8||manifest[0].size>100000||
+  files.filter(function(f){return /^[A-Za-z0-9_-]+\.png$/.test(f.name)}).length!==files.length-1)
+  throw Error('Select one HQ-PROFILE-POSTS.json and one to seven matching PNG images');
+ var pack=JSON.parse(await manifest[0].text());
+ if(!pack||pack.packageType!=='LIFE-HQ-profile-drafts'||pack.version!==1||pack.profileId!==activeProfileId)
+  throw Error('This package belongs to another HQ profile, or uses an unsupported format. Switch to the correct profile first.');
+ if(!Array.isArray(pack.posts)||pack.posts.length<1||pack.posts.length>7||pack.posts.length!==files.length-1)
+  throw Error('Include one to seven posts and exactly one different PNG per post');
+ var seen=new Set(),images=new Map(files.filter(function(f){return f.name.endsWith('.png')}).map(function(f){return [f.name,f]}));
+ var fingerprint=new Uint8Array(await crypto.subtle.digest('SHA-256',await manifest[0].arrayBuffer()));
+ var packageId='profile-'+activeProfileId+'-'+Array.from(fingerprint).map(function(n){return n.toString(16).padStart(2,'0')}).join('');
+ if(data.posts.some(function(p){return p.importPackageId===packageId})||
+  (data.trash||[]).some(function(t){return t.kind==='post'&&t.record&&t.record.importPackageId===packageId}))
+  throw Error('This exact package has already been imported. Your earlier posts were kept; use the existing drafts instead of creating duplicates.');
+ var prepared=[],staged=[],usedDateNames=new Set();
+ for(var i=0;i<pack.posts.length;i++){
+  var p=pack.posts[i];
+  if(!p||typeof p!=='object'||typeof p.title!=='string'||!p.title.trim()||p.title.length>120||
+    typeof p.caption!=='string'||!p.caption.trim()||p.caption.length>10000||
+    typeof p.altText!=='string'||!p.altText.trim()||p.altText.length>2000||
+    typeof p.assetRef!=='string'||!/^[A-Za-z0-9_-]+\.png$/.test(p.assetRef)||!images.has(p.assetRef)||
+    seen.has(p.assetRef))throw Error('Post '+(i+1)+' needs its own named PNG, caption, title and accessible image description');
+  seen.add(p.assetRef);
+  if(p.date!==undefined&&p.date!==''&&(
+   typeof p.date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(p.date)||
+   !Number.isFinite(new Date(p.date+'T12:00:00Z').getTime())||
+   new Date(p.date+'T12:00:00Z').toISOString().slice(0,10)!==p.date))throw Error('Invalid calendar date for '+p.title);
+  if(p.time!==undefined&&p.time!==''&&(typeof p.time!=='string'||!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(p.time)))
+   throw Error('Invalid time for '+p.title);
+  if(p.networks!==undefined&&(!Array.isArray(p.networks)||p.networks.some(function(n){return !CHANNELS.includes(n)})))
+   throw Error('Unrecognised social platform for '+p.title);
+  if(p.platformCaptions!==undefined&&(!p.platformCaptions||typeof p.platformCaptions!=='object'||Array.isArray(p.platformCaptions)||
+    Object.keys(p.platformCaptions).some(function(k){return !CHANNELS.includes(k)||typeof p.platformCaptions[k]!=='string'||p.platformCaptions[k].length>10000})))
+   throw Error('Invalid platform-specific caption for '+p.title);
+  var mediaId='profile-pack-'+id(),postId=id();
+  staged.push({id:mediaId,file:images.get(p.assetRef),name:p.assetRef,alt:p.altText});
+  prepared.push({
+   id:postId,profileId:activeProfileId,importPackageId:packageId,title:p.title.trim(),caption:p.caption.trim(),
+   date:p.date||'',time:p.time||'12:00',topic:TOPICS.includes(p.topic)?p.topic:'General',
+   status:'Draft',reviewed:false,reviewedAt:'',format:'Image',
+   networks:Array.isArray(p.networks)?p.networks.slice():[],platformCaptions:p.platformCaptions||{},
+   assetRef:'localmedia:'+mediaId,mediaRefs:['localmedia:'+mediaId],altText:p.altText.trim(),
+   notes:'Imported image package — review and choose real destination before sharing'
+  });
+ }
+ if(seen.size!==images.size)throw Error('Every picture must match exactly one post; unused PNGs are not allowed');
+ if(!await confirmHQ('Import '+prepared.length+' new image posts into '+profileName()+'? All are private drafts. Existing posts and approved content will not be replaced. No network posting will occur. An encrypted recovery copy is saved first.','Import into '+profileName()))return false;
+ try{
+  await savePreImportRecovery({kind:'profile-package',importedPostIds:prepared.map(function(p){return p.id})});
+ }catch(err){throw Error('Import stopped: a safe encrypted recovery copy could not be saved. '+err.message)}
+ var priorPosts=data.posts,priorMedia=data.media.slice(),written=[];
+ try{
+  for(var asset of staged){
+   var type=await mediaPut(asset.id,asset.file);
+   written.push(asset.id);
+   data.media.push({id:asset.id,profileId:activeProfileId,name:asset.name,type:type,size:asset.file.size,
+    altText:asset.alt,source:'profile-package',sourcePackageId:packageId,createdAt:new Date().toISOString()});
+  }
+  data.posts=priorPosts.concat(prepared);
+  validateWorkspace(data);
+  if(!await save({skipRender:true}))throw Error('Could not save the new encrypted drafts');
+  navigate('posts');info(prepared.length+' new posts imported into '+profileName()+'. Review them before sharing.');
+  return true;
+ }catch(err){
+  data.posts=priorPosts;data.media=priorMedia;
+  for(var mediaId of written){try{await mediaRemove(mediaId)}catch(cleanup){console.warn('Temporary image cleanup failed',cleanup)}}
+  throw Error('Import rolled back: '+err.message+'. Your previous posts were kept.');
+ }
+}
+
 async function importWeekPackage(fileList){
  if(activeProfileId!=='life')throw Error('L-I-F-E launch packs can only be imported into the L-I-F-E profile');
  if(!data||!key)throw Error('Unlock your L-I-F-E HQ workspace first');
