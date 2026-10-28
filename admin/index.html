@@ -1604,12 +1604,22 @@ q('#body').addEventListener('click',async function(e){
  if(await save()){editing=p.id;navigate('post');info('New private draft added — add images and review before scheduling')}
 });
 
+/* Protect saved artwork across every profile, including posts in the recycle bin. */
+function mediaUsage(mediaId,deletedPostIds){
+ var ref='localmedia:'+mediaId;
+ var active=(data.posts||[]).filter(function(p){return postMediaRefs(p).includes(ref)});
+ var recycled=(data.trash||[]).filter(function(entry){
+  return entry.kind==='post'&&(!deletedPostIds||!deletedPostIds.has(entry.id))&&postMediaRefs(entry.record).includes(ref);
+ });
+ return active.length+recycled.length;
+}
 /* Recycle bin stores original records inside the encrypted workspace. */
 function moveToTrash(kind,ref){
  var groups={post:'posts',contact:'contacts',plan:'adPlans',media:'media'},field=groups[kind];
  if(!field)throw Error('Unsupported bin item type');
- var source=data[field]||[],item=source.find(function(x){return x.id===ref});
+ var source=data[field]||[],item=source.find(function(x){return x.id===ref&&inProfile(x)});
  if(!item)return;
+ if(kind==='media'&&mediaUsage(item.id))throw Error('This picture is used by a saved post. Remove or replace it in the post before moving it to the bin.');
  data.trash=data.trash||[];
  data.trash.push({id:id(),kind:kind,record:structuredClone(item),deletedAt:new Date().toISOString()});
  data[field]=source.filter(function(x){return x.id!==ref});
@@ -1624,11 +1634,27 @@ function trash(){
   return '<div class="bin-item"><div><strong>'+esc(itemName)+'</strong><p class="muted">'+esc(item.kind)+' · Deleted '+esc(itemDate)+'</p></div><div class="actions"><button class="btn" data-restore-trash="'+esc(item.id)+'">Restore</button><button class="btn danger" data-purge-trash="'+esc(item.id)+'">Delete permanently</button></div></div>';
  }).join(''):'<p>The bin is empty. Deleted posts, contacts, campaign plans and media will appear here.</p>')+'</div>';
 }
-async function permanentlyRemove(binId){
- var item=(data.trash||[]).find(function(x){return x.id===binId});if(!item)return;
- if(item.kind==='media')await mediaRemove(item.record.id);
- data.trash=data.trash.filter(function(x){return x.id!==binId});
+/* Save recycle-bin metadata first; remove encrypted image files only after a successful save. */
+async function purgeBinItems(ids){
+ if(pendingSaves)throw Error('Wait until the current save finishes');
+ var selected=new Set(ids),items=(data.trash||[]).filter(function(x){return selected.has(x.id)&&inProfile(x.record)});
+ if(!items.length)return;
+ var deletingPosts=new Set(items.filter(function(x){return x.kind==='post'}).map(function(x){return x.id}));
+ for(var entry of items){
+  if(entry.kind==='media'&&mediaUsage(entry.record.id,deletingPosts))
+   throw Error('Cannot permanently delete "'+entry.record.name+'" because a saved or recoverable post still needs it. Delete those post records first, or keep the image.');
+ }
+ var previous=data.trash;
+ data.trash=previous.filter(function(x){return !selected.has(x.id)||!inProfile(x.record)});
+ if(!await save({skipRender:true})){data.trash=previous;throw Error('Encrypted recycle-bin changes could not be saved; nothing was permanently deleted')}
+ var cleanupFailed=0;
+ for(var item of items.filter(function(x){return x.kind==='media'})){
+  try{await mediaRemove(item.record.id)}catch(err){cleanupFailed++}
+ }
+ navigate('trash');
+ info(items.length+' item(s) permanently removed from '+profileName()+(cleanupFailed?'; some unused encrypted image files could not be cleaned up.':''));
 }
+async function permanentlyRemove(binId){return purgeBinItems([binId])}
 async function restoreFromBin(binId){
  var item=(data.trash||[]).find(function(x){return x.id===binId});if(!item)return;
  var groups={post:'posts',contact:'contacts',plan:'adPlans',media:'media'};
@@ -1648,14 +1674,13 @@ q('#body').addEventListener('click',async function(e){
    delete copy.weeklyKey;data.posts.push(copy);if(await save()){editing=copy.id;navigate('post')}return}
   if(b.dataset.trashPost){if(!await confirmHQ('Move this record to the recycling bin? Published content will remain live on external platforms.','Move to bin'))return;moveToTrash('post',b.dataset.trashPost);if(await save())navigate('posts');return}
   if(b.dataset.restoreTrash){await restoreFromBin(b.dataset.restoreTrash);return}
-  if(b.dataset.purgeTrash){if(!await confirmHQ('Permanently delete this item? This cannot be undone except by restoring a separate backup.','Delete permanently'))return;await permanentlyRemove(b.dataset.purgeTrash);if(await save())navigate('trash');return}
+  if(b.dataset.purgeTrash){if(!await confirmHQ('Permanently delete this item? This cannot be undone except by restoring a separate backup.','Delete permanently'))return;await permanentlyRemove(b.dataset.purgeTrash);return}
   if(b.dataset.action==='trashselected'){var count=selectedPostIds.size;if(!count)return info('Select posts to move to the bin');if(!await confirmHQ('Move '+count+' selected posts to the recycle bin?','Move to bin'))return;Array.from(selectedPostIds).forEach(function(p){moveToTrash('post',p)});selectedPostIds.clear();if(await save())navigate('posts');return}
   if(b.dataset.action==='emptytrash'){
     var visibleBin=(data.trash||[]).filter(function(item){return inProfile(item.record)});
     if(!visibleBin.length)return info('The recycle bin for '+profileName()+' is empty');
     if(!await confirmHQ('Permanently delete '+visibleBin.length+' items for '+profileName()+' only? All other profiles will be kept. Make a backup first if needed.','Empty this profile bin'))return;
-    for(var item of visibleBin.slice())await permanentlyRemove(item.id);
-    if(await save())navigate('trash');return}
+    await purgeBinItems(visibleBin.map(function(x){return x.id}));return}
  }catch(err){info('Action failed: '+err.message)}
 });
 q('#body').addEventListener('change',function(e){
