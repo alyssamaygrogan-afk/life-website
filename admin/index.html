@@ -294,6 +294,7 @@ function validateWorkspace(d){
    if(p[stat]!==undefined&&(!Number.isSafeInteger(p[stat])||p[stat]<0||p[stat]>1000000000))throw Error('Invalid post metric');
   }
   if(p.reviewed!==undefined&&typeof p.reviewed!=='boolean')throw Error('Invalid review record');
+  if(p.scheduledExternallyConfirmed!==undefined&&typeof p.scheduledExternallyConfirmed!=='boolean')throw Error('Invalid external scheduling confirmation');
  }
  if(d.launchChecks!==undefined){
   var v=d.launchChecks;
@@ -497,6 +498,7 @@ function releaseChecks(p,reviewed,postedExternally){
    if(!item||profileOf(item)!==profileOf(p))problems.push('An attached image is missing or belongs to another profile.');
   }
  }
+ if(p.status==='Scheduled manually'&&!p.scheduledExternallyConfirmed)problems.push('Confirm that this post is already scheduled on the correct social account before recording Scheduled manually.');
  if(p.status==='Published'&&!postedExternally)problems.push('Only mark Published after confirming you posted it on the external platform.');
  if(p.status==='Published'&&!p.publishedUrl)problems.push('Enter the public HTTPS post link before recording Published.');
  if(profileOf(p)==='life'&&isPublicStatus(p.status)&&tag==='Venue / tickets'){
@@ -544,6 +546,7 @@ function postForm(){
  +'<label class="field full">External published post link <span class="form-hint">(only after posting manually)</span><input name="publishedUrl" type="url" maxlength="2000" value="'+esc(x.publishedUrl||'')+'"></label>'
  +'<fieldset class="channels full"><legend>Manual performance numbers (optional)</legend><div class="twocol"><label class="field">Views<input type="number" name="views" min="0" step="1" max="1000000000" value="'+esc(x.views??'')+'"></label><label class="field">Link clicks<input type="number" name="clicks" min="0" step="1" max="1000000000" value="'+esc(x.clicks??'')+'"></label><label class="field">Interactions<input type="number" name="interactions" min="0" step="1" max="1000000000" value="'+esc(x.interactions??'')+'"></label></div><p class="muted">Type figures copied from the actual platform. No account analytics are connected.</p></fieldset>'
  +'<label class="setup-check full"><input type="checkbox" name="reviewed" '+(x.reviewed===true?'checked':'')+'> I have reviewed this current draft, checked its facts, consent, accessibility and links.</label>'
+ +'<label class="setup-check full"><input type="checkbox" name="scheduledExternally" '+(x.scheduledExternallyConfirmed===true?'checked':'')+'> I confirm this was scheduled on the correct external social account; HQ did not schedule it.</label>'
  +'<label class="setup-check full"><input type="checkbox" name="postedExternally"> I personally confirm this was published outside L-I-F-E Social Media HQ.</label>'
  +'<p class="form-error full hidden" id="postformerror" role="alert"></p>'
  +'<div class="actions full"><button class="btn primary">Save post</button><button class="btn" type="button" data-action="posts">Cancel</button>'+(editing?'<button class="btn danger" type="button" data-action="deletepost">Move to bin</button>':'')+'</div></form></div>';
@@ -1048,7 +1051,7 @@ q('#body').addEventListener('submit',async function(e){
     ctaUrl:String(f.get('ctaUrl')).trim(),publishedUrl:String(f.get('publishedUrl')).trim(),
     views:metricNumber(f.get('views'),1000000000),clicks:metricNumber(f.get('clicks'),1000000000),
     interactions:metricNumber(f.get('interactions'),1000000000),
-    reviewed:f.has('reviewed'),reviewedAt:f.has('reviewed')?new Date().toISOString():''
+    reviewed:f.has('reviewed'),reviewedAt:f.has('reviewed')?new Date().toISOString():'',scheduledExternallyConfirmed:f.has('scheduledExternally')
    });
    if(!p.title||!p.caption){useCaptionTab('Facebook');return formProblem('#postformerror','Add a title and Facebook caption.')}
    if(p.mediaRefs.length&&p.format==='Text')p.format=p.mediaRefs.length>1?'Carousel':'Image';
@@ -1927,7 +1930,7 @@ async function changeOneStatus(post,next){
  if(next==='Scheduled manually'){
   if(post.reviewed!==true||post.status!=='Ready')return info('Verify and mark Ready before recording external scheduling');
   if(!await confirmHQ('Have you already scheduled '+post.title+' on the correct '+profileName()+' social account? HQ cannot schedule it.','Confirm external scheduling'))return;
-  return changePosts([post],function(p){p.status='Scheduled manually'},'External scheduling recorded in HQ');
+  return changePosts([post],function(p){p.status='Scheduled manually';p.scheduledExternallyConfirmed=true},'External scheduling recorded in HQ');
  }
  if(!await confirmHQ('Set '+post.title+' to '+next+' and clear its local approval? This will not undo anything in Buffer.','Change HQ status'))return;
  return changePosts([post],function(p){p.status=next;p.reviewed=false;p.reviewedAt=''},'Local status updated to '+next);
@@ -1955,7 +1958,7 @@ async function applySelectedAction(){
  if(op==='Scheduled manually'){
   if(posts.some(function(p){return p.reviewed!==true||!['Ready','Scheduled manually'].includes(p.status)}))return info('Verify all selected posts before recording scheduling');
   if(!await confirmHQ('Have you already scheduled all '+posts.length+' posts outside HQ? This option does not schedule them.','Confirm external scheduling'))return;
-  return changePosts(posts,function(p){p.status=op},posts.length+' external schedules recorded');
+  return changePosts(posts,function(p){p.status=op;p.scheduledExternallyConfirmed=true},posts.length+' external schedules recorded');
  }
  if(!['Draft','Needs review'].includes(op))return;
  if(!await confirmHQ('Set '+posts.length+' posts to '+op+' and clear their local approvals? Nothing will be sent to Buffer.','Change selected statuses'))return;
