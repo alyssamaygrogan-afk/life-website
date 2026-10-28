@@ -413,7 +413,7 @@ q('#authform').addEventListener('submit',async function(e){
  }catch(err){key=null;data=null;q('#autherror').textContent='Unable to log in. Check your password or restore an encrypted backup.'}
  finally{q('#unlock').disabled=false}
 });
-function navigate(s){if(q('#hq-more-nav'))q('#hq-more-nav').classList.toggle('active',!['home','posts','calendar','media'].includes(s));if(activeProfileId!=='life'&&['brand','campaigns','contacts','contact','ad'].includes(s))s='home';if(s==='connections'&&activeProfileId!=='life')s='profiles';section=s;renderProfileSwitcher();q('#heading').textContent={home:'Campaign overview',posts:'Posts & drafts',post:'Post editor',media:'Media library',trash:'Recycle bin',brand:'Brand Studio',calendar:'Publishing calendar',contacts:'Press & invitations',contact:'Contact editor',campaigns:'Campaigns & advertising',ad:'Advertising plan',reports:'Manual performance report',connections:'Connected accounts setup',profiles:'Profiles & accounts',settings:'Backups & privacy'}[s]||'Social Media HQ';document.querySelectorAll('#nav button').forEach(function(b){b.classList.toggle('active',b.dataset.page===s)});if(s==='post'){var selected=data.posts.find(function(p){return p.id===editing});draftMediaRefs=(selected&&Array.isArray(selected.mediaRefs)?selected.mediaRefs:(selected&&String(selected.assetRef||'').startsWith('localmedia:')?[selected.assetRef]:[])).slice();activeCaptionPlatform='Facebook'}render()}
+function navigate(s){if(section==='post'&&s!=='post'){var unsaved=q('#postform');if(unsaved&&unsaved.dataset.hasUnsavedChanges==='yes'&&!confirm('This post has unsaved changes. Leave without saving?'))return}if(q('#hq-more-nav'))q('#hq-more-nav').classList.toggle('active',!['home','posts','calendar','media'].includes(s));if(activeProfileId!=='life'&&['brand','campaigns','contacts','contact','ad'].includes(s))s='home';if(s==='connections'&&activeProfileId!=='life')s='profiles';section=s;renderProfileSwitcher();q('#heading').textContent={home:'Campaign overview',posts:'Posts & drafts',post:'Post editor',media:'Media library',trash:'Recycle bin',brand:'Brand Studio',calendar:'Publishing calendar',contacts:'Press & invitations',contact:'Contact editor',campaigns:'Campaigns & advertising',ad:'Advertising plan',reports:'Manual performance report',connections:'Connected accounts setup',profiles:'Profiles & accounts',settings:'Backups & privacy'}[s]||'Social Media HQ';document.querySelectorAll('#nav button').forEach(function(b){b.classList.toggle('active',b.dataset.page===s)});if(s==='post'){var selected=data.posts.find(function(p){return p.id===editing});draftMediaRefs=(selected&&Array.isArray(selected.mediaRefs)?selected.mediaRefs:(selected&&String(selected.assetRef||'').startsWith('localmedia:')?[selected.assetRef]:[])).slice();activeCaptionPlatform='Facebook'}render()}
 q('#nav').addEventListener('click',function(e){var b=e.target.closest('[data-page]');if(b)navigate(b.dataset.page)});
 
 q('#hq-more-nav').addEventListener('click',function(){
@@ -988,7 +988,9 @@ function approvalFields(p){
 }
 q('#body').addEventListener('input',function(e){
  var form=e.target.closest&&e.target.closest('#postform');
- if(!form||e.target.name==='reviewed'||e.target.name==='postedExternally')return;
+ if(!form)return;
+ form.dataset.hasUnsavedChanges='yes';
+ if(e.target.name==='reviewed'||e.target.name==='postedExternally')return;
  var approval=form.querySelector('[name="reviewed"]');
  if(approval&&approval.checked){
   approval.checked=false;
@@ -1000,6 +1002,7 @@ q('#body').addEventListener('input',function(e){
 q('#body').addEventListener('change',function(e){
  var form=e.target.closest&&e.target.closest('#postform');
  if(!form)return;
+ form.dataset.hasUnsavedChanges='yes';
  if(e.target.name==='reviewed'){
   if(e.target.checked)form.dataset.reviewedConfirmed='yes';
   return;
@@ -1042,7 +1045,7 @@ q('#body').addEventListener('submit',async function(e){
    if(isPublicStatus(p.status))await verifyPostImagesOnDevice([p]);
    var previousPosts=data.posts;
    data.posts=previousPosts.filter(function(z){return z.id!==p.id}).concat([p]);
-   if(await save({skipRender:true})){editing=null;navigate('posts');info(p.reviewed?'Review saved successfully; post is '+p.status:'Post saved as '+p.status)}
+   if(await save({skipRender:true})){form.dataset.hasUnsavedChanges='';editing=null;navigate('posts');info(p.reviewed?'Review saved successfully; post is '+p.status:'Post saved as '+p.status)}
    else{data.posts=previousPosts;formProblem('#postformerror','Saving failed. The previous saved post is unchanged; keep the editor open and try again.');}
   }catch(err){formProblem('#postformerror','Could not save this post: '+err.message)}
  }else if(form.id==='contactform'){
@@ -1398,6 +1401,7 @@ async function addMediaFiles(files,attach){
   if(attach){
    if(form&&form.elements.format&&form.elements.format.value==='Text')form.elements.format.value=draftMediaRefs.length>1?'Carousel':'Image';
    refreshMediaComposer();
+   if(form)form.dataset.hasUnsavedChanges='yes';
   }
   /* Image blobs and workspace metadata are separate stores; compensate on any failure. */
   if(!await save(attach?{skipRender:true}:undefined))throw Error('Image metadata was not saved on this device');
