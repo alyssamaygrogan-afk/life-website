@@ -1099,6 +1099,13 @@ q('#body').addEventListener('submit',async function(e){
    if(!p.title||!p.caption){useCaptionTab('Facebook');return formProblem('#postformerror','Add a title and Facebook caption.')}
    if(p.mediaRefs.length&&p.format==='Text')p.format=p.mediaRefs.length>1?'Carousel':'Image';
    if(!POST_STATUSES.includes(p.status)||!TOPICS.includes(p.topic)||!FORMATS.includes(p.format)||p.networks.some(function(n){return !CHANNELS.includes(n)}))return formProblem('#postformerror','Choose valid publishing settings.');
+   /* Never fabricate external status from the post editor. Each channel needs its own checked result. */
+   if(['Scheduled manually','Published'].includes(p.status)&&(!oldPost||oldPost.status!==p.status))
+    return formProblem('#postformerror','Record actual scheduled or published results per platform using Posts → More actions. Do not select this status directly in the editor.');
+   if(oldPost&&['Scheduled manually','Published'].includes(oldPost.status)&&approvalFields(oldPost)!==approvalFields(p))
+    return formProblem('#postformerror','An externally recorded post has a posting history. Duplicate it for content changes; this editor can still update its manual performance figures and notes.');
+   p.contentRevision=publishingReceiptRevision(oldPost||{});
+   if(oldPost&&approvalFields(oldPost)!==approvalFields(p))p.contentRevision++;
    var changedFromApproved=oldPost&&oldPost.reviewed===true&&approvalFields(oldPost)!==approvalFields(p);
    if(changedFromApproved&&f.has('reviewed')&&form.dataset.reviewedConfirmed!=='yes')
     return formProblem('#postformerror','This post changed since it was last approved. Untick then tick the review confirmation again before saving it as approved.');
@@ -2280,11 +2287,7 @@ async function applySelectedAction(){
  if(op==='handoff')return showBulkBuffer(posts);
  if(op==='Ready')return verifyRecords(posts);
  if(posts.some(function(p){return p.status==='Published'}))return info('Bulk changes cannot overwrite published records');
- if(op==='Scheduled manually'){
-  if(posts.some(function(p){return p.reviewed!==true||!['Ready','Scheduled manually'].includes(p.status)}))return info('Verify all selected posts before recording scheduling');
-  if(!await confirmHQ('Have you already scheduled all '+posts.length+' posts outside HQ? This option does not schedule them.','Confirm external scheduling'))return;
-  return changePosts(posts,function(p){p.status=op;p.scheduledExternallyConfirmed=true},posts.length+' external schedules recorded');
- }
+ if(op==='Scheduled manually')return info('Record each platform separately using the individual post’s More actions → Record external result. Bulk status changes are not proof of scheduling.');
  if(!['Draft','Needs review'].includes(op))return;
  if(!await confirmHQ('Set '+posts.length+' posts to '+op+' and clear their local approvals? Nothing will be sent to Buffer.','Change selected statuses'))return;
  return changePosts(posts,function(p){p.status=op;p.reviewed=false;p.reviewedAt=''},posts.length+' statuses changed to '+op);
