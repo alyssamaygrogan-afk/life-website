@@ -543,7 +543,7 @@ function manualPublishingProgress(p){
  return {total:channels.length,live:live,covered:covered,last:last,allPublished:channels.length>0&&live===channels.length,allAccounted:channels.length>0&&covered===channels.length};
 }
 function manualReceiptDetails(p){
- var list=currentPublicationReceipts(p),progress=manualPublishingProgress(p),legacy=!list.length&&['Published','Scheduled manually'].includes(p.status);
+ var list=currentPublicationReceipts(p),progress=manualPublishingProgress(p),legacy=['Published','Scheduled manually'].includes(p.status)&&(!manualPublishingProgress(p).allAccounted);
  return '<div class="manual-receipt-summary"><strong>External publishing — user-entered only</strong><p class="muted">'+progress.live+' / '+progress.total+' platforms reported live · '+progress.covered+' scheduled or live'+(legacy?' · Legacy overall status (no channel receipt)':'')+'</p>'
  +(list.length?'<details><summary>View '+list.length+' manual record'+(list.length===1?'':'s')+'</summary>'+list.slice().reverse().map(function(r){
   return '<p class="muted">'+esc(r.platform)+' · '+esc(r.stage)+' · '+esc(r.account)+' · '+esc(r.recordedAt.slice(0,16).replace('T',' '))
@@ -783,8 +783,12 @@ function reports(){
  var views=posted.reduce(function(n,p){return n+Number(p.views||0)},0);
  var clicks=posted.reduce(function(n,p){return n+Number(p.clicks||0)},0);
  var interactions=posted.reduce(function(n,p){return n+Number(p.interactions||0)},0);
- var out='<div class="panel hero"><h3>Results entered by you</h3><p>These are figures recorded manually from social media platforms, not live connected analytics. Include the original post link when available.</p></div>';
+ var out='<div class="panel hero"><h3>Results entered by you</h3><p>These figures and external-posting receipts are entered manually, not retrieved or verified using the Buffer API. No actual social analytics are connected.</p></div>';
  out+='<div class="stats four"><div class="panel">Marked published<strong>'+posted.length+'</strong></div><div class="panel">Views<strong>'+views.toLocaleString('en-GB')+'</strong></div><div class="panel">Clicks<strong>'+clicks.toLocaleString('en-GB')+'</strong></div><div class="panel">Interactions<strong>'+interactions.toLocaleString('en-GB')+'</strong></div></div>';
+ var tracked=profileRecords('posts').filter(function(p){return currentPublicationReceipts(p).length>0});
+ var pending=tracked.filter(function(p){var x=manualPublishingProgress(p);return !x.allPublished});
+ out+='<div class="panel"><h3>External publishing records — user-entered</h3><p><strong>'+tracked.length+'</strong> post(s) have manual channel records; <strong>'+pending.length+'</strong> still have platforms not recorded live. These are not independently verified by Buffer.</p>'
+ +(tracked.length?tracked.map(function(p){return '<div class="row"><strong>'+esc(p.title)+'</strong>'+manualReceiptDetails(p)+'<button class="btn" type="button" data-edit="'+esc(p.id)+'">Review post</button></div>'}).join(''):'<p>No individual channel records saved yet. Open Posts and use Record external result after checking the social account.</p>')+'</div>';
  out+='<div class="panel"><div class="actions"><button class="btn" data-action="exportposts">Export posts CSV</button><button class="btn" data-action="exportads">Export ad plans CSV</button></div><p class="muted">Exports contain private draft captions and notes. Keep CSV files private; they are not encrypted.</p></div>';
  out+='<div class="panel"><h3>Post-level results</h3>'+(posted.length?posted.map(function(p){return '<div class="row"><strong>'+esc(p.title)+'</strong> <span class="tag">Self-reported</span><p>'+esc(p.date||'')+' · '+esc((p.networks||[]).join(', '))+'</p><div class="post-metrics"><span>Views '+Number(p.views||0).toLocaleString('en-GB')+'</span><span>Clicks '+Number(p.clicks||0).toLocaleString('en-GB')+'</span><span>Interactions '+Number(p.interactions||0).toLocaleString('en-GB')+'</span></div><button class="btn" data-edit="'+esc(p.id)+'">Edit figures</button></div>'}).join(''):'No posts marked published manually yet.')+'</div>';
  return out;
@@ -1001,7 +1005,7 @@ async function handoffToBuffer(postId){
  if(!canShare){dialog.querySelector('[data-share-press]').disabled=true;dialog.querySelector('[data-share-support]').textContent='This device cannot hand off the attached artwork via the share sheet. Copy caption and save images to finish in Buffer.';}
  dialog.querySelector('[data-share-press]').addEventListener('click',function(){
   if(!canShare)return;
-  var payload={title:'L-I-F-E · '+post.title,text:caption()};if(files.length)payload.files=files;
+  var payload={title:profileName()+' · '+post.title,text:caption()};if(files.length)payload.files=files;
   /* Must invoke immediately in button click for Safari user activation. */
   navigator.share(payload).then(function(){info('Shared to the chosen app. Check Buffer; HQ did not schedule it.');close()})
    .catch(function(e){if(e&&e.name!=='AbortError')info('Share failed: '+e.message)});
@@ -2241,6 +2245,8 @@ async function recordChannelPublication(post,preferred){
  if(!(post.networks||[]).some(function(n){return CHANNELS.includes(n)}))return info('Choose a target platform first');
  var result=await requestManualPublicationRecord(post,preferred||'published');
  if(!result)return;
+ var prior=manualPublishingProgress(post).last[result.platform];
+ if(prior&&prior.stage==='published'&&result.stage==='scheduled')return info('This platform was already recorded live. Create a new post to plan another publication.');
  if(!(post.networks||[]).includes(result.platform))return info('Choose an intended platform');
  if((post.publicationReceipts||[]).length>=150)return info('The publication log is full');
  var now=new Date().toISOString(),receipt={id:id(),source:'manual',revision:publishingReceiptRevision(post),platform:result.platform,stage:result.stage,account:result.account,publicUrl:result.publicUrl,scheduledFor:result.scheduledFor,recordedAt:now};
@@ -2248,7 +2254,7 @@ async function recordChannelPublication(post,preferred){
  if(progress.allPublished){candidate.status='Published';candidate.publishedUrl=result.publicUrl||Object.values(progress.last).find(function(x){return x.stage==='published'})?.publicUrl||'';candidate.publishedExternallyAt=now}
  else if(progress.allAccounted){candidate.status='Scheduled manually';candidate.scheduledExternallyConfirmed=true}
  else if(post.status==='Ready')candidate.status='Ready';
- var errors=releaseChecks(candidate,true,progress.allPublished);
+ var errors=releaseChecks(candidate,true,progress.allPublished||post.status==='Published');
  if(errors.length)return info('Could not record: '+errors[0]);
  try{await verifyPostImagesOnDevice([candidate])}catch(e){return info(e.message)}
  await changePosts([post],function(p){
