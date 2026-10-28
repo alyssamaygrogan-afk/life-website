@@ -847,9 +847,9 @@ async function handoffToBuffer(postId){
  if(!platforms.length)platforms=['Facebook'];
  var dialog=document.createElement('dialog');dialog.setAttribute('aria-label','Share post using Buffer mobile');
  dialog.style.cssText='border:0;border-radius:16px;width:calc(100% - 30px);max-width:510px;max-height:90dvh;overflow:auto;padding:20px;background:#fff;color:#18243b;box-shadow:0 20px 80px #0007';
- dialog.innerHTML='<h3>Share post to Buffer</h3><p><strong>'+esc(post.title)+'</strong></p><p class="muted">'+files.length+' attached image(s) · '+esc(post.date||'Unscheduled')+'</p>'
+ dialog.innerHTML='<h3>Share '+esc(profileName())+' post to Buffer</h3><p><strong>'+esc(post.title)+'</strong></p><p class="muted">'+files.length+' attached image(s) · '+esc(post.date||'Unscheduled')+'</p>'
  +'<label class="field">Choose caption<select data-buffer-share-platform>'+platforms.map(function(p){return '<option>'+esc(p)+'</option>'}).join('')+'</select></label>'
- +'<p class="status-note">Select Buffer in the iPhone share sheet. Check that the caption and every image arrived, then save or schedule inside Buffer. This is NOT an automatic Buffer connection or confirmed transfer.</p>'
+ +'<p class="status-note">Select Buffer in the iPhone share sheet. Make sure you choose the correct '+esc(profileName())+' social account, then check the caption and every image before saving or scheduling in Buffer. This is NOT an automatic Buffer connection or confirmed transfer.</p>'
  +'<p class="muted" role="status" data-share-support></p><div class="actions"><button type="button" class="btn primary" data-share-press>Share via iPhone</button><button type="button" class="btn" data-share-copy>Copy caption</button><button type="button" class="btn" data-share-cancel>Close</button></div>'
  +(refs.length?'<p class="muted">If images do not arrive, save them here and attach in Buffer:</p><div class="actions">'+refs.map(function(ref,i){return '<button type="button" class="btn" data-save-buffer-image="'+i+'">Save image '+(i+1)+'</button>'}).join('')+'</div>':'')
  +'<p class="muted"><a href="https://publish.buffer.com/" target="_blank" rel="noopener noreferrer">Open Buffer manually</a> (this link cannot transfer a post).</p>';
@@ -1694,8 +1694,8 @@ async function verifyRecords(posts){
 function requestPublishedUrl(post){
  return new Promise(function(resolve){
   var d=document.createElement('dialog');d.className='hq-review-dialog';
-  d.innerHTML='<h2>Record a post already published</h2><p><strong>'+esc(post.title)+'</strong></p><p>This does not publish anything. Only use this after checking the real post on the official L-I-F-E account. One URL records one actual publication, not every platform.</p>'
-   +'<label class="field">Public post URL<input type="url" placeholder="https://..." data-pub-url></label><label class="setup-check"><input type="checkbox" data-pub-confirm> I have personally checked the post is live on the correct account.</label>'
+  d.innerHTML='<h2>Record a post already published</h2><p><strong>'+esc(post.title)+'</strong></p><p>This does not publish anything. Only use this after checking the real post on the correct '+esc(profileName())+' social account. One URL records one actual publication, not every platform.</p>'
+   +'<label class="field">Public post URL<input type="url" placeholder="https://..." data-pub-url></label><label class="setup-check"><input type="checkbox" data-pub-confirm> I have checked that the post is live on the correct '+esc(profileName())+' account.</label>'
    +'<p class="danger-text" data-pub-error role="alert"></p><div class="actions"><button class="btn primary" type="button" data-pub-save>Record as Published</button><button class="btn" type="button" data-pub-cancel>Cancel</button></div>';
   document.body.appendChild(d);
   function done(v){if(d.open)d.close();d.remove();resolve(v)}
@@ -1724,7 +1724,7 @@ async function changeOneStatus(post,next){
  if(post.status==='Published')return info('Use the full editor for already-published history');
  if(next==='Scheduled manually'){
   if(post.reviewed!==true||post.status!=='Ready')return info('Verify and mark Ready before recording external scheduling');
-  if(!await confirmHQ('Have you already scheduled '+post.title+' on an actual L-I-F-E social account? HQ cannot schedule it.','Confirm external scheduling'))return;
+  if(!await confirmHQ('Have you already scheduled '+post.title+' on the correct '+profileName()+' social account? HQ cannot schedule it.','Confirm external scheduling'))return;
   return changePosts([post],function(p){p.status='Scheduled manually'},'External scheduling recorded in HQ');
  }
  if(!await confirmHQ('Set '+post.title+' to '+next+' and clear its local approval? This will not undo anything in Buffer.','Change HQ status'))return;
