@@ -1170,7 +1170,7 @@ async function unpackLifeHQZip(file,profilePack){
   files.push(new File([bytes],filename,{type:filename.endsWith('.png')?'image/png':'application/json'}));
   cursor+=recordSize;
  }
-  if(cursor!==centralStart+centralSize||(profilePack?(files.filter(function(f){return f.name==='HQ-PROFILE-POSTS.json'}).length!==1&&true):false)||files.filter(function(f){return f.name.endsWith('.png')}).length!==count-1||(!profilePack&&files.filter(function(f){return /^LIFE-HQ-week-\d{4}-\d{2}-\d{2}\.json$/.test(f.name)}).length!==1))throw Error('The ZIP must contain one manifest and one picture per post');
+  if(cursor!==centralStart+centralSize||(profilePack&&files.filter(function(f){return f.name==='HQ-PROFILE-POSTS.json'}).length!==1)||files.filter(function(f){return f.name.endsWith('.png')}).length!==count-1||(!profilePack&&files.filter(function(f){return /^LIFE-HQ-week-\d{4}-\d{2}-\d{2}\.json$/.test(f.name)}).length!==1))throw Error('The ZIP must contain one manifest and one picture per post');
  return files;
 }
 q('#body').addEventListener('change',async function(e){
