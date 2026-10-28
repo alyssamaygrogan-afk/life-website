@@ -268,7 +268,7 @@ async function switchProfile(next){
  if(['post','contact','ad'].includes(section)&&!await confirmHQ('Leave the current editor? Any unsaved changes will be lost.','Switch profile'))return;
  var old=activeProfileId;activeProfileId=next;data.activeProfileId=next;
  if(!await save({skipRender:true})){activeProfileId=old;data.activeProfileId=old;renderProfileSwitcher();return}
- selectedPostIds.clear();postFilter='all';postQuery='';applyBrand();
+ selectedPostIds.clear();postFilter='all';postQuery='';mediaQuery='';mediaFilter='all';mediaLimit=48;applyBrand();
  editing=null;contactEditing=null;adEditing=null;draftMediaRefs=[];
  metaBridgeRuntime={pages:[],status:null,message:''};
  var allowed=['posts','media','calendar','trash','profiles','settings','home'];
@@ -1517,7 +1517,7 @@ function mediaComposer(){
  +'<div class="brand-rainbow"></div><h3>Make a branded square card</h3><label class="field">Card headline<input id="card-headline" maxlength="100" placeholder="e.g. 90 DAYS TO GO!"></label>'
  +'<button class="btn" type="button" data-action="makebrandcard" data-life-only>Generate branded 1080 × 1080 image</button></div>';
 }
-var mediaQuery='',mediaFilter='all';
+var mediaQuery='',mediaFilter='all',mediaLimit=48;
 function mediaPostUsage(mediaId){
  var ref='localmedia:'+mediaId;
  var active=profileRecords('posts').filter(function(p){return postMediaRefs(p).includes(ref)});
@@ -1533,11 +1533,13 @@ function mediaLibrary(){
    (mediaFilter==='unused'&&usage.active.length===0&&usage.recoverable===0)||
    (mediaFilter==='needs-alt'&&!String(m.altText||'').trim()));
  }).sort(function(a,b){return (b.createdAt||'').localeCompare(a.createdAt||'')});
+ var matchedCount=items.length;
+ items=items.slice(0,mediaLimit);
  var used=all.filter(function(m){return mediaPostUsage(m.id).active.length>0}).length;
  return '<div class="panel hero"><h3>Media library · '+esc(profileName())+'</h3><p>Private encrypted pictures saved to this device. Find artwork, edit descriptions and see which posts use it. Maximum 8 MB per image.</p><strong>'+all.length+' pictures · '+used+' in posts</strong></div>'
   +'<div class="panel upload-zone" id="media-drop"><h3>▧ Add images</h3><p>PNG, JPEG or WebP. Repeat files in this profile are recognised when their checksums are available. Drag and drop here, or choose files.</p><label class="btn primary">Upload images<input id="library-image-upload" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden></label></div>'
   +'<div class="panel"><h3>Find your artwork</h3><div class="post-tools"><label>Search filename or description<input id="hq-media-search" aria-label="Search media" value="'+esc(mediaQuery)+'" placeholder="Search pictures"></label>'
-  +'<label>Show<select id="hq-media-filter"><option value="all" '+(mediaFilter==='all'?'selected':'')+'>All pictures</option><option value="used" '+(mediaFilter==='used'?'selected':'')+'>Used in posts</option><option value="unused" '+(mediaFilter==='unused'?'selected':'')+'>Not used</option><option value="needs-alt" '+(mediaFilter==='needs-alt'?'selected':'')+'>Needs description</option></select></label></div><p role="status" class="muted">Showing '+items.length+' of '+all.length+' pictures in '+esc(profileName())+'.</p></div>'
+  +'<label>Show<select id="hq-media-filter"><option value="all" '+(mediaFilter==='all'?'selected':'')+'>All pictures</option><option value="used" '+(mediaFilter==='used'?'selected':'')+'>Used in posts</option><option value="unused" '+(mediaFilter==='unused'?'selected':'')+'>Not used</option><option value="needs-alt" '+(mediaFilter==='needs-alt'?'selected':'')+'>Needs description</option></select></label></div><p role="status" class="muted">Showing '+items.length+' of '+matchedCount+' matching pictures ('+all.length+' total) in '+esc(profileName())+'.</p></div>'
   +'<div class="panel"><h3>My images</h3><div class="tile-grid">'+(items.length?items.map(function(m){
    var usage=mediaPostUsage(m.id),count=usage.active.length;
    var usageInfo=count?count+' post'+(count===1?'':'s')+' using this':usage.recoverable?'Only in recycle bin':'Not used in a post';
@@ -1545,7 +1547,7 @@ function mediaLibrary(){
    +(m.altText?'<small title="'+esc(m.altText)+'">'+esc(m.altText)+'</small>':'<small class="danger-text">Description missing</small>')
    +(count?'<details><summary>Used in '+count+' post'+(count===1?'':'s')+'</summary>'+usage.active.map(function(p){return '<p><button type="button" class="btn" data-open-post-from-media="'+esc(p.id)+'">'+esc(p.title||'Untitled post')+'</button></p>'}).join('')+'</details>':'')
    +'<div class="actions"><button class="btn" data-edit-media-description="'+esc(m.id)+'">Edit description</button><button class="btn" data-use-media="'+esc(m.id)+'">New post</button><button class="btn" data-export-media="'+esc(m.id)+'">Save copy</button><button class="btn danger" data-trash-media="'+esc(m.id)+'" '+(count||usage.recoverable?'disabled title="Used by a saved or recoverable post"':'')+'>Bin</button></div></div>';
-  }).join(''):'<p>No matching pictures. Try clearing the search or change the filter.</p>')+'</div></div>';
+  }).join(''):'<p>No matching pictures. Try clearing the search or change the filter.</p>')+'</div>'+(items.length<matchedCount?'<button class="btn" type="button" data-media-more>Show 48 more pictures</button>':'')+'</div>';
 }
 
 /* SHA-256 fingerprints are private metadata for files newly uploaded through HQ.
@@ -1588,6 +1590,7 @@ async function editMediaDescription(mediaId){
 q('#body').addEventListener('input',function(e){
  if(e.target.id!=='hq-media-search')return;
  mediaQuery=String(e.target.value||'').slice(0,250);
+ mediaLimit=48;
  var cursor=e.target.selectionStart;
  render();
  var input=q('#hq-media-search');
@@ -1596,6 +1599,7 @@ q('#body').addEventListener('input',function(e){
 q('#body').addEventListener('change',function(e){
  if(e.target.id!=='hq-media-filter')return;
  mediaFilter=e.target.value;
+ mediaLimit=48;
  render();
 });
 
@@ -1706,8 +1710,9 @@ q('#body').addEventListener('click',async function(e){
     if(!post)throw Error('This post is not available in the selected profile');
     editing=post.id;draftMediaRefs=postMediaRefs(post).slice();navigate('post');return;
    }
+   if(b.hasAttribute('data-media-more')){mediaLimit=Math.min(5000,mediaLimit+48);render();return}
    if(b.dataset.editMediaDescription){await editMediaDescription(b.dataset.editMediaDescription);return}
-   if(b.dataset.useMedia){editing=null;navigate('post');draftMediaRefs=['localmedia:'+b.dataset.useMedia];refreshMediaComposer();return}
+   if(b.dataset.useMedia){var chosen=profileRecords('media').find(function(x){return x.id===b.dataset.useMedia});if(!chosen)throw Error('Image is not in this profile');editing=null;draftMediaRefs=['localmedia:'+chosen.id];navigate('post');return}
   if(b.dataset.exportMedia){await exportMedia(b.dataset.exportMedia);return}
   if(b.dataset.trashMedia){if(!await confirmHQ('Move this image to the recycle bin? Existing posts can continue to use it.','Move to bin'))return;moveToTrash('media',b.dataset.trashMedia);if(await save())navigate('media');return}
  }catch(err){alert('Media action failed: '+err.message)}
