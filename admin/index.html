@@ -1614,9 +1614,12 @@ q('#body').addEventListener('click',async function(e){
   if(b.dataset.restoreTrash){await restoreFromBin(b.dataset.restoreTrash);return}
   if(b.dataset.purgeTrash){if(!await confirmHQ('Permanently delete this item? This cannot be undone except by restoring a separate backup.','Delete permanently'))return;await permanentlyRemove(b.dataset.purgeTrash);if(await save())navigate('trash');return}
   if(b.dataset.action==='trashselected'){var count=selectedPostIds.size;if(!count)return info('Select posts to move to the bin');if(!await confirmHQ('Move '+count+' selected posts to the recycle bin?','Move to bin'))return;Array.from(selectedPostIds).forEach(function(p){moveToTrash('post',p)});selectedPostIds.clear();if(await save())navigate('posts');return}
-  if(b.dataset.action==='emptytrash'){if(!await confirmHQ('Permanently delete '+(data.trash||[]).length+' records? Please download an encrypted backup first if needed.','Empty bin'))return;
-   for(var item of (data.trash||[]).slice())await permanentlyRemove(item.id);
-   if(await save())navigate('trash');return}
+  if(b.dataset.action==='emptytrash'){
+    var visibleBin=(data.trash||[]).filter(function(item){return inProfile(item.record)});
+    if(!visibleBin.length)return info('The recycle bin for '+profileName()+' is empty');
+    if(!await confirmHQ('Permanently delete '+visibleBin.length+' items for '+profileName()+' only? All other profiles will be kept. Make a backup first if needed.','Empty this profile bin'))return;
+    for(var item of visibleBin.slice())await permanentlyRemove(item.id);
+    if(await save())navigate('trash');return}
  }catch(err){info('Action failed: '+err.message)}
 });
 q('#body').addEventListener('change',function(e){
