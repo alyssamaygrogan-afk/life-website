@@ -238,7 +238,7 @@ function renderProfileSwitcher(){
  var context=q('#hq-profile-context');if(context)context.textContent=profileName()+' • Private planning workspace';
 }
 async function switchProfile(next){
- if(!data||!key||pendingSaves){info('Finish saving before switching');return}
+ if(!data||!key||pendingSaves||mediaUploadBusy){info('Finish saving before switching');return}
  if(!data.profiles.some(function(p){return p.id===next}))return;
  if(next===activeProfileId)return;
  if(['post','contact','ad'].includes(section)&&!await confirmHQ('Leave the current editor? Any unsaved changes will be lost.','Switch profile'))return;
@@ -354,7 +354,7 @@ async function decrypt(p,r){
 }
 function info(s){var el=q('#status');el.textContent=s;el.classList.remove('hidden');setTimeout(function(){if(el.textContent===s)el.classList.add('hidden')},2900)}
 function lock(){
- if(pendingSaves){info('Please wait while your changes save');return}
+ if(pendingSaves||mediaUploadBusy){info('Please wait while your changes save');return}
  if(lastSaveFailed&&!confirm('Discard unsaved changes and lock the workspace?'))return;
  sessionStorage.setItem('life-hq-manual-lock','1');
  metaBridgeRuntime={pages:[],status:null,message:''};session++;key=null;saved=null;data=null;editing=null;contactEditing=null;lastSaveFailed=false;selectedPostIds.clear();draftMediaRefs=[];
@@ -976,6 +976,7 @@ q('#body').addEventListener('submit',async function(e){
  var form=e.target,f=new FormData(form);
  if(form.id==='postform'){
   try{
+   if(pendingSaves||mediaUploadBusy)return formProblem('#postformerror','Finish uploading pictures or saving before submitting this post.');
    var oldPost=data.posts.find(function(z){return z.id===editing});
    var p=Object.assign({},oldPost||{},{
     profileId:activeProfileId,
@@ -1255,7 +1256,7 @@ function showMediaPreviews(){
 async function importWeekPackage(fileList){
  if(activeProfileId!=='life')throw Error('L-I-F-E launch packs can only be imported into the L-I-F-E profile');
  if(!data||!key)throw Error('Unlock your L-I-F-E HQ workspace first');
- if(pendingSaves)throw Error('Finish saving your current work before importing');
+ if(pendingSaves||mediaUploadBusy)throw Error('Finish saving or uploading pictures before importing');
  var files=Array.from(fileList||[]),manifests=files.filter(function(f){return /^LIFE-HQ-week-\d{4}-\d{2}-\d{2}\.json$/.test(f.name)});
   if(manifests.length!==1||files.length!==8||files.filter(function(f){return /^[A-Za-z0-9_-]+\.png$/.test(f.name)}).length!==7)
    throw Error('Choose one dated L-I-F-E manifest and its seven PNG pictures');
@@ -1336,12 +1337,14 @@ function mediaLibrary(){
   return '<div class="media-tile"><img data-hq-media="'+esc(m.id)+'" alt="'+esc(m.altText||m.name)+'"><small title="'+esc(m.name)+'">'+esc(m.name)+'</small><small>'+Math.max(1,Math.round((m.size||0)/1024))+' KB</small><div class="actions"><button class="btn" data-use-media="'+esc(m.id)+'">New post</button><button class="btn" data-export-media="'+esc(m.id)+'">Save copy</button><button class="btn danger" data-trash-media="'+esc(m.id)+'">Bin</button></div></div>';
  }).join(''):'<p>No uploaded images yet. Add some above, or import the weekly image package from Posts.</p>')+'</div></div>';
 }
+var mediaUploadBusy=false;
 async function addMediaFiles(files,attach){
  var list=Array.from(files||[]);
  if(!list.length)return;
- if(!data||!key||pendingSaves)throw Error('Wait for the current save or unlock HQ first');
+ if(!data||!key||pendingSaves||mediaUploadBusy)throw Error('Wait for the current upload or save to finish, or unlock HQ first');
  if(list.length>20)throw Error('Upload 20 images at a time or fewer');
  if(attach&&draftMediaRefs.length+list.length>8)throw Error('A post supports up to 8 images');
+ mediaUploadBusy=true;
  var oldMedia=data.media.slice(),oldRefs=draftMediaRefs.slice(),written=[],count=0;
  var form=attach?q('#postform'):null,oldFormat=form&&form.elements.format?form.elements.format.value:null;
  try{
@@ -1366,7 +1369,7 @@ async function addMediaFiles(files,attach){
   for(var mediaId of written){try{await mediaRemove(mediaId)}catch(cleanupErr){console.warn('Image upload cleanup failed',cleanupErr)}}
   if(attach)refreshMediaComposer();
   throw Error('Image upload was rolled back: '+err.message);
- }
+ }finally{mediaUploadBusy=false}
 }
 function refreshMediaComposer(){
  var target=q('#composer-attachments');if(!target)return;
@@ -1630,7 +1633,7 @@ async function recoverBeforeWeekImport(){
 }
 async function restoreFullBackup(file){
  if(!file||file.size>175000000)throw Error('The selected backup is too large');
- if(pendingSaves)throw Error('Finish saving before restoring');
+ if(pendingSaves||mediaUploadBusy)throw Error('Finish saving or uploading pictures before restoring');
  var pack=JSON.parse(await file.text());
  if(!pack||pack.format!=='LIFE-HQ-complete-encrypted-backup'||pack.version!==1||!pack.workspace||!Array.isArray(pack.media)||pack.media.length>5000)throw Error('Invalid complete backup');
  if(!confirm('Replace this device workspace and images? A complete backup of the current workspace will be downloaded before replacement.'))return;
@@ -1962,7 +1965,7 @@ q('#quickunlock').addEventListener('click',async function(){
 });
 q('#forgetdevice').addEventListener('click',async function(){await forgetThisDevice();info('This device will now need the workspace password')});
 q('#logout').addEventListener('click',async function(){
- if(pendingSaves){info('Finish saving first');return}
+ if(pendingSaves||mediaUploadBusy){info('Finish saving or uploading before logging out');return}
  await forgetThisDevice();lock();info('Logged out; trusted-device access removed');
 });
 q('#toggle-sidebar').addEventListener('click',function(){
