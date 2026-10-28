@@ -134,6 +134,63 @@ html,body,#app,#app main,#app .body{max-width:100%;min-width:0}
  #app .panel{padding:12px;max-width:100%}
  #app .body{padding-left:max(9px,env(safe-area-inset-left,0px));padding-right:max(9px,env(safe-area-inset-right,0px))}
 }
+
+/* iPhone post-editor containment: native date/time inputs and nested grid
+   children used to expand the form outside its white card. */
+#app{width:100%;max-width:100%;min-width:0}
+#app main,#app .body,#app .panel,#app form{box-sizing:border-box}
+#app .body{width:100%;min-width:0;max-width:100%}
+#app .panel{width:100%;max-width:100%;min-width:0}
+#postform,#postform > *,#postform .field,#postform .field > input,
+#postform .field > textarea,#postform .field > select,
+#postform fieldset,#postform .channel-options,#postform .status-note,
+#postform .form-error,#postform .compose-media-preview,
+#postform .upload-zone{box-sizing:border-box;min-width:0;max-width:100%}
+#postform .field{overflow-wrap:anywhere}
+#postform .field > input,#postform .field > textarea,#postform .field > select{
+  width:100%;max-width:100%;min-width:0;
+}
+#postform input[type="date"],#postform input[type="time"]{
+  display:block;width:100%;max-width:100%;min-width:0;
+  -webkit-appearance:none;appearance:none;
+}
+#postform fieldset{min-inline-size:0;width:100%}
+#postform .panel.full{width:100%;min-width:0;max-width:100%;overflow-wrap:anywhere}
+#postform .actions{min-width:0}
+@media(max-width:700px){
+  html,body{width:100%;max-width:100%;margin:0}
+  #app{display:block;width:100%;max-width:100%;min-width:0}
+  #app main,#app header,#app .body{width:100%;max-width:100%;min-width:0}
+  #postform{
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    gap:8px;
+    width:100%;min-width:0;max-width:100%;
+  }
+  #postform > *{flex:0 0 auto;min-width:0;max-width:100%;width:100%;margin-left:0;margin-right:0}
+  #postform .field{display:block;width:100%;min-width:0;max-width:100%}
+  #postform .field > input,#postform .field > textarea,#postform .field > select{
+    display:block;width:100%;min-width:0;max-width:100%;
+    font-size:16px;
+  }
+  #postform .setup-check input[type="checkbox"],#postform .channel-options input[type="checkbox"]{
+    flex:0 0 auto;width:18px;min-width:18px
+  }
+  #postform .channel-options label{width:auto;min-width:0}
+  #postform .channels .twocol{display:grid;grid-template-columns:minmax(0,1fr)}
+  #app aside{
+    position:fixed;left:0;right:0;bottom:0;
+    width:100vw;max-width:100vw;min-width:0;
+    padding-left:max(7px,env(safe-area-inset-left,0px));
+    padding-right:max(7px,env(safe-area-inset-right,0px));
+    box-sizing:border-box;overflow:hidden;
+  }
+  #app aside nav{min-width:0;max-width:100%;width:100%;flex:1 1 auto}
+  #app header{box-sizing:border-box}
+  .hq-review-dialog{box-sizing:border-box;max-width:calc(100vw - 24px)}
+}
+
 </style></head><body>
 <section id="signin" class="auth"><div class="authbox"><div class="logo">L-I-F-E</div><h1>Social Media HQ</h1><p class="muted">Private planning workspace for the 30 January 2027 launch in Milton Keynes.</p><form id="authform"><label class="field">Workspace email label (not Google sign-in)<input id="email" type="email" value="alyssa-may.grogan@lifeinfullecosystem.org" autocomplete="username" required></label><label class="field">Device workspace password<input id="password" type="password" minlength="12" autocomplete="current-password" required></label><label class="setup-check"><input id="trustdevice" type="checkbox"> Keep me signed in on this trusted device for 30 days</label><button id="unlock" class="btn primary">Login</button><p id="autherror" class="error" role="alert"></p></form><button id="quickunlock" class="btn hidden" type="button">Continue on this device</button><button id="forgetdevice" class="btn danger hidden" type="button">Forget this device</button><p class="muted">First login on this browser: choose a private workspace password (12+ characters). Your browser password manager may save it. Trusted-device access is optional; anyone using this browser profile could open your local drafts.</p><div class="warn"><strong>Encrypted private workspace.</strong> Your content stays on this device unless you export an encrypted backup. This is not Google sign-in or cross-device syncing; social publishing and spending are not connected.</div><div id="iphone-app-install" class="pwa-install-card" hidden><div class="pwa-install-heading">📱 Install L-I-F-E HQ on your iPhone</div><p>First, log in here and choose <strong>Backup → Download complete encrypted backup</strong> to protect any existing posts and pictures.</p><p>Then open this page in <strong>Safari</strong>, tap <strong>Share → Add to Home Screen</strong>, turn on <strong>Open as Web App</strong>, and tap <strong>Add</strong>.</p><p class="muted">The Home Screen app can have separate private storage. If it starts empty, restore your complete encrypted backup inside the installed app.</p></div><p class="muted"><a class="link" href="/">← Return to L-I-F-E website</a></p></div></section>
 <div id="app" class="hidden"><aside><div class="brand"><div class="logo">L-I-F-E</div><p>SOCIAL MEDIA HQ</p></div><nav id="nav"><button data-page="home">⌂ Overview</button><button data-page="posts">✎ Posts</button><button data-page="media">▧ Media</button><button data-page="trash">♻ Recycle Bin</button><button data-page="calendar">▦ Calendar</button><button data-page="brand">✦ Brand Studio</button><button data-page="campaigns">Campaigns</button><button data-page="reports">Reports</button><button data-page="contacts">Outreach</button><button data-page="connections">Accounts</button><button data-page="settings">Backup</button></nav></aside><main><header><div><small class="muted">L-I-F-E • Internal campaign</small><h2 id="heading">Overview</h2></div><div class="toolbar-row"><button class="btn hq-sidebar-toggle" id="toggle-sidebar" type="button" aria-label="Collapse or expand navigation" aria-expanded="true">☰</button><button class="btn" id="lock" type="button">Lock</button><button class="btn danger" id="logout" type="button">Log out</button></div></header><div id="body" class="body"></div></main></div><div id="status" class="hidden" role="status"></div>
