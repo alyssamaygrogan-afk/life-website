@@ -326,7 +326,7 @@ function validateWorkspace(d){
    seenProfiles.add(pr.id);
    if(pr.accounts!==undefined){
     if(!Array.isArray(pr.accounts)||pr.accounts.length>30)throw Error('Invalid account list');
-    for(var a of pr.accounts)if(!a||!isText(a.service,80)||!isText(a.handle,160)||!isText(a.url,1000))throw Error('Invalid profile account');
+    for(var a of pr.accounts)if(!a||!isText(a.service,80)||!isText(a.handle,160)||!isText(a.url,1000)||(a.url&&!safeUrl(a.url)))throw Error('Invalid profile account');
    }
   }
   if(!seenProfiles.has('life')||!seenProfiles.has('bears-adventures'))throw Error('Default profile missing');
@@ -699,7 +699,7 @@ function profilesPage(){
    +(pr.id===activeProfileId?'':'<button class="btn primary" type="button" data-open-profile="'+esc(pr.id)+'">Switch to profile</button>')
    +(pr.id==='life'?'<p class="muted">Existing L-I-F-E material remains here.</p>':'<form data-rename-profile="'+esc(pr.id)+'"><label class="field">Rename profile<input name="name" required maxlength="80" value="'+esc(pr.name)+'"></label><button class="btn" type="submit">Save name</button></form>')
    +'<h3 style="margin-top:16px">Social account references</h3><p class="muted">Saved for planning only. Not a live Buffer or social account connection.</p>'
-   +(accounts.length?accounts.map(function(a,i){return '<div class="hq-profile-account"><strong>'+esc(a.service)+'</strong> · '+esc(a.handle)+(a.url?'<p><a class="link" href="'+esc(a.url)+'" target="_blank" rel="noopener noreferrer">Open profile</a></p>':'')+'<button type="button" class="btn danger" data-remove-account-from="'+esc(pr.id)+'" data-remove-account-number="'+i+'">Remove reference</button></div>'}).join(''):'<p class="muted">No accounts added yet.</p>')
+   +(accounts.length?accounts.map(function(a,i){return '<div class="hq-profile-account"><strong>'+esc(a.service)+'</strong> · '+esc(a.handle)+(a.url&&safeUrl(a.url)?'<p><a class="link" href="'+esc(a.url)+'" target="_blank" rel="noopener noreferrer">Open profile</a></p>':'')+'<button type="button" class="btn danger" data-remove-account-from="'+esc(pr.id)+'" data-remove-account-number="'+i+'">Remove reference</button></div>'}).join(''):'<p class="muted">No accounts added yet.</p>')
    +'<form data-add-account-to="'+esc(pr.id)+'"><label class="field">Platform<select name="service">'+choices+'</select></label><label class="field">Account name / @handle<input name="handle" required maxlength="160"></label><label class="field">Public account URL (optional)<input name="url" type="url" maxlength="1000" placeholder="https://..."></label><button class="btn" type="submit">Add account reference</button></form></div>';
  }).join('')
  +'<div class="warn">References do not connect or authorise social accounts. Select the genuine destination in Buffer before scheduling anything.</div>';
