@@ -1700,7 +1700,7 @@ async function savePreImportRecovery(details){
  var before={
   id:'before-week-import-'+Date.now()+'-'+id().slice(0,8),
   createdAt:date,
-  kind:opts.weekStart?'weekly-package':'caption-update',
+  kind:opts.kind==='profile-package'?'profile-package':(opts.weekStart?'weekly-package':'caption-update'),
   weekStart:opts.weekStart||null,
   profileId:activeProfileId,
   replacedPostIds:Array.isArray(opts.replacedPostIds)?opts.replacedPostIds.slice():[],
@@ -1723,7 +1723,7 @@ function chooseWeeklyRecovery(snapshots){
   dlg.setAttribute('aria-label','Choose an encrypted recovery point');
   dlg.innerHTML='<h3>Restore earlier weekly drafts</h3><p>Choose a saved recovery point. For new weekly imports, only the posts replaced by that import will be restored. Other profiles and later posts remain untouched.</p>'
   +'<label class="field">Recovery point<select data-recovery-select>'+snapshots.map(function(r){
-   return '<option value="'+esc(r.id)+'">'+esc(new Date(r.createdAt).toLocaleString('en-GB'))+' · '+esc(r.weekStart||'Older full-workspace recovery')+'</option>';
+   return '<option value="'+esc(r.id)+'">'+esc(new Date(r.createdAt).toLocaleString('en-GB'))+' · '+esc(r.kind==='profile-package'?'Profile import · '+(r.profileId||'unknown'):r.weekStart||'Older full-workspace recovery')+'</option>';
   }).join('')+'</select></label>'
   +'<p class="muted">Imported pictures are retained in the media library for safety. For older recovery copies, restoring may replace the entire workspace — a separate warning will appear.</p>'
   +'<div class="actions"><button class="btn primary" type="button" data-recovery-choose>Continue</button><button class="btn" type="button" data-recovery-cancel>Cancel</button></div>';
@@ -1736,6 +1736,29 @@ function chooseWeeklyRecovery(snapshots){
  });
 }
 
+
+/* Restore only the new drafts introduced by a generic profile ZIP. */
+async function restoreProfilePostsFromRecovery(backup){
+ if(!Array.isArray(backup.importedPostIds)||backup.importedPostIds.length<1||
+  backup.importedPostIds.length>7||typeof backup.profileId!=='string'||
+  !data.profiles.some(function(p){return p.id===backup.profileId}))
+  throw Error('This profile import recovery record is incomplete');
+ var importIds=new Set(backup.importedPostIds);
+ var current=data.posts.filter(function(p){return importIds.has(p.id)});
+ if(current.some(function(p){return profileOf(p)!==backup.profileId}))
+  throw Error('An imported draft now belongs to another profile. Recovery stopped.');
+ if(current.some(function(p){return p.reviewed===true||['Ready','Scheduled manually','Published'].includes(p.status)}))
+  throw Error('Some imported posts have already been approved or externally scheduled/published. Recovery will not discard them.');
+ if(!await confirmHQ('Remove '+current.length+' unapproved imported drafts from '+backup.profileId+'? This only reverses the selected package. All other posts, profiles and pictures stay saved.','Reverse this profile import'))return;
+ var oldPosts=data.posts;
+ try{
+  data.posts=oldPosts.filter(function(p){return !importIds.has(p.id)});
+  validateWorkspace(data);
+  if(!await save({skipRender:true}))throw Error('Encrypted restore could not be saved');
+  navigate('posts');info('Only the selected profile import was reversed. Artwork was kept in Media.');
+ }catch(err){data.posts=oldPosts;throw err}
+}
+
 async function restoreWeeklyPostsFromRecovery(backup,previous){
  var week=backup.weekStart;
  if(!/^\d{4}-\d{2}-\d{2}$/.test(week||'')||!Array.isArray(backup.replacedPostIds)||!Array.isArray(backup.importedPostIds)||
@@ -1746,7 +1769,7 @@ async function restoreWeeklyPostsFromRecovery(backup,previous){
  if(old.length!==originals.size)throw Error('Some original posts were missing from the recovery copy');
  var current=data.posts.filter(function(p){return imports.has(p.id)&&profileOf(p)==='life'&&dates.includes(p.date)});
  if(data.posts.some(function(p){return imports.has(p.id)&&!current.includes(p)}))throw Error('An imported post now belongs to another date or profile; automatic recovery stopped');
- if(current.some(function(p){return ['Published','Scheduled manually'].includes(p.status)}))throw Error('An imported post is recorded as scheduled/published. Restore it manually to protect its external posting record.');
+ if(current.some(function(p){return p.reviewed===true||['Ready','Published','Scheduled manually'].includes(p.status)}))throw Error('An imported post has been approved, scheduled or published. Restore it manually to protect its review and posting history.');
  var message='Restore earlier L-I-F-E drafts for '+week+' to '+dates[6]+'? '+current.length+' imported posts will be removed from Posts and '+old.length+' earlier drafts recovered. Other projects and all pictures will be retained. Edits to these imported posts will be lost.';
  if(!await confirmHQ(message,'Restore this week only'))return;
  var beforePosts=data.posts,beforeTrash=data.trash||[];
@@ -1774,6 +1797,7 @@ async function recoverBeforeWeekImport(){
  var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:un64(backup.workspace.iv)},key,un64(backup.workspace.payload));
  var previous=validateWorkspace(JSON.parse(dec.decode(plain)));
  if(backup.kind==='weekly-package')return restoreWeeklyPostsFromRecovery(backup,previous);
+ if(backup.kind==='profile-package')return restoreProfilePostsFromRecovery(backup);
  if(!await confirmHQ('OLDER recovery point: this will replace every profile, every post and every picture, including newer Bears Adventures work. Save a complete backup of your CURRENT workspace first. Continue only if you want to discard changes made since this old snapshot.','Continue to full restore'))return;
  if(!await confirmHQ('Final confirmation: replace ALL profiles, posts, pictures and settings with the old snapshot? This cannot be undone without another complete backup.','Replace everything'))return;
  var currentStored=localStorage.getItem(STORAGE),currentMedia=await allEncryptedMedia(),originalData=data,originalSaved=saved;
