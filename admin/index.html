@@ -2121,9 +2121,14 @@ q('#body').addEventListener('click',async function(e){
  var b=e.target.closest('button');if(!b||!data)return;
  try{
   if(b.dataset.statusTab){postFilter=b.dataset.statusTab;selectedPostIds.clear();render();return}
-  if(b.dataset.duplicate){var original=data.posts.find(function(p){return p.id===b.dataset.duplicate});if(!original)return;
-   var copy=Object.assign({},structuredClone(original),{id:id(),profileId:activeProfileId,title:'Copy — '+original.title,status:'Draft',reviewed:false,reviewedAt:'',publishedUrl:'',date:''});
-   delete copy.weeklyKey;data.posts.push(copy);if(await save()){editing=copy.id;navigate('post')}return}
+  if(b.dataset.duplicate){var original=profileRecords('posts').find(function(p){return p.id===b.dataset.duplicate});if(!original)return;
+   var copy=Object.assign({},structuredClone(original),{id:id(),profileId:activeProfileId,title:'Copy — '+original.title,status:'Draft',reviewed:false,reviewedAt:'',publishedUrl:'',date:'',contentRevision:0,publicationReceipts:[],scheduledExternallyConfirmed:false});
+   for(var flag of ['weeklyKey','importPackageId','publishedExternallyAt','views','clicks','interactions'])delete copy[flag];
+   var beforePosts=data.posts;
+   data.posts=beforePosts.concat([copy]);
+   if(await save({skipRender:true})){editing=copy.id;navigate('post');info('Unpublished copy created, with no inherited external posting records.')}
+   else{data.posts=beforePosts;info('Unable to save this copy. The existing post has not changed.')}
+   return}
   if(b.dataset.trashPost){if(!await confirmHQ('Move this record to the recycling bin? Published content will remain live on external platforms.','Move to bin'))return;moveToTrash('post',b.dataset.trashPost);if(await save())navigate('posts');return}
   if(b.dataset.restoreTrash){await restoreFromBin(b.dataset.restoreTrash);return}
   if(b.dataset.purgeTrash){if(!await confirmHQ('Permanently delete this item? This cannot be undone except by restoring a separate backup.','Delete permanently'))return;await permanentlyRemove(b.dataset.purgeTrash);return}
@@ -2275,7 +2280,7 @@ async function changeOneStatus(post,next){
  if(post.status==='Published')return info('Use the full editor for already-published history');
  if(next==='Scheduled manually')return recordChannelPublication(post,'scheduled');
  if(!await confirmHQ('Set '+post.title+' to '+next+' and clear its local approval? This will not undo anything in Buffer.','Change HQ status'))return;
- return changePosts([post],function(p){p.status=next;p.reviewed=false;p.reviewedAt=''},'Local status updated to '+next);
+ return changePosts([post],function(p){p.status=next;p.reviewed=false;p.reviewedAt='';p.contentRevision=publishingReceiptRevision(p)+1;p.scheduledExternallyConfirmed=false;p.publishedUrl=''},'Draft updated; old external records kept only as history. Nothing was changed in Buffer.');
 }
 function showBulkBuffer(posts){
  var d=document.createElement('dialog');d.className='hq-review-dialog';
@@ -2300,7 +2305,7 @@ async function applySelectedAction(){
  if(op==='Scheduled manually')return info('Record each platform separately using the individual post’s More actions → Record external result. Bulk status changes are not proof of scheduling.');
  if(!['Draft','Needs review'].includes(op))return;
  if(!await confirmHQ('Set '+posts.length+' posts to '+op+' and clear their local approvals? Nothing will be sent to Buffer.','Change selected statuses'))return;
- return changePosts(posts,function(p){p.status=op;p.reviewed=false;p.reviewedAt=''},posts.length+' statuses changed to '+op);
+ return changePosts(posts,function(p){p.status=op;p.reviewed=false;p.reviewedAt='';p.contentRevision=publishingReceiptRevision(p)+1;p.scheduledExternallyConfirmed=false;p.publishedUrl=''},posts.length+' drafts updated; older external records kept only as history. Buffer was not changed.');
 }
 q('#body').addEventListener('click',function(e){
  var b=e.target.closest('button');if(!b||!data)return;
