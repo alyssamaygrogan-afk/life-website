@@ -228,6 +228,15 @@ body[data-hq-profile]:not([data-hq-profile="life"]) [data-life-only]{display:non
 .post-more[open] .actions{margin:10px 0 0}
 .post-primary-actions .btn{flex:1 1 150px;min-width:0}
 @media(max-width:700px){.post-primary-actions .btn{flex:1 1 120px}.post-more summary{width:100%;justify-content:center}}
+
+.hq-channel-progress{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:6px;margin:8px 0}
+.hq-channel-row{border:1px solid #dbe4ea;background:#fafbfe;border-radius:9px;padding:8px 10px;min-width:0;display:flex;flex-wrap:wrap;gap:3px 8px;align-items:center;overflow-wrap:anywhere}
+.hq-channel-row strong{color:#243753}
+.hq-channel-row span,.hq-channel-row small,.hq-channel-row a{font-size:.8rem}
+.hq-channel-row span{color:#465e70}
+.hq-channel-row small{color:#465e70;width:100%}
+.manual-receipt-summary{min-width:0;max-width:100%;margin:8px 0 12px;padding:10px;border-radius:10px;border:1px solid #dbe4ea}
+.manual-receipt-summary details{margin-top:8px}
 </style></head><body>
 <section id="signin" class="auth"><div class="authbox"><div class="logo">L-I-F-E</div><h1>Social Media HQ</h1><p class="muted">Private planning workspace for the 30 January 2027 launch in Milton Keynes.</p><form id="authform"><label class="field">Workspace email label (not Google sign-in)<input id="email" type="email" value="alyssa-may.grogan@lifeinfullecosystem.org" autocomplete="username" required></label><label class="field">Device workspace password<input id="password" type="password" minlength="12" autocomplete="current-password" required></label><label class="setup-check"><input id="trustdevice" type="checkbox"> Keep me signed in on this trusted device for 30 days</label><button id="unlock" class="btn primary">Login</button><p id="autherror" class="error" role="alert"></p></form><button id="quickunlock" class="btn hidden" type="button">Continue on this device</button><button id="forgetdevice" class="btn danger hidden" type="button">Forget this device</button><p class="muted">First login on this browser: choose a private workspace password (12+ characters). Your browser password manager may save it. Trusted-device access is optional; anyone using this browser profile could open your local drafts.</p><div class="warn"><strong>Encrypted private workspace.</strong> Your content stays on this device unless you export an encrypted backup. This is not Google sign-in or cross-device syncing; social publishing and spending are not connected.</div><div id="iphone-app-install" class="pwa-install-card" hidden><div class="pwa-install-heading">📱 Install L-I-F-E HQ on your iPhone</div><p>First, log in here and choose <strong>Backup → Download complete encrypted backup</strong> to protect any existing posts and pictures.</p><p>Then open this page in <strong>Safari</strong>, tap <strong>Share → Add to Home Screen</strong>, turn on <strong>Open as Web App</strong>, and tap <strong>Add</strong>.</p><p class="muted">The Home Screen app can have separate private storage. If it starts empty, restore your complete encrypted backup inside the installed app.</p></div><p class="muted"><a class="link" href="/">← Return to L-I-F-E website</a></p></div></section>
 <div id="app" class="hidden"><aside><div class="brand"><div class="logo">L-I-F-E</div><p>SOCIAL MEDIA HQ</p></div><nav id="nav"><button data-page="home">⌂ Overview</button><button data-page="posts">✎ Posts</button><button data-page="media">▧ Media</button><button data-page="trash">♻ Recycle Bin</button><button data-page="calendar">▦ Calendar</button><button data-page="brand" data-life-only>✦ Brand Studio</button><button data-page="campaigns" data-life-only>Campaigns</button><button data-page="reports">Reports</button><button data-page="contacts" data-life-only>Outreach</button><button data-page="connections">Accounts</button><button data-page="settings">Backup</button></nav><button id="hq-more-nav" type="button" aria-haspopup="dialog">☰ More</button></aside><main><header><div><small id="hq-profile-context" class="muted">Social Media HQ • Current profile</small><h2 id="heading">Overview</h2></div><div class="toolbar-row"><label class="hq-profile-switch" for="hq-profile-select">Profile<select id="hq-profile-select" aria-label="Choose Social Media HQ profile"></select></label><button id="hq-manage-profiles" class="btn" type="button">Manage profiles</button><button class="btn hq-sidebar-toggle" id="toggle-sidebar" type="button" aria-label="Collapse or expand navigation" aria-expanded="true">☰</button><button class="btn" id="lock" type="button">Lock</button><button class="btn danger" id="logout" type="button">Log out</button></div></header><div id="body" class="body"></div></main></div><div id="status" class="hidden" role="status"></div>
@@ -543,15 +552,26 @@ function manualPublishingProgress(p){
  return {total:channels.length,live:live,covered:covered,last:last,allPublished:channels.length>0&&live===channels.length,allAccounted:channels.length>0&&covered===channels.length};
 }
 function manualReceiptDetails(p){
- var list=currentPublicationReceipts(p),progress=manualPublishingProgress(p),legacy=['Published','Scheduled manually'].includes(p.status)&&(!manualPublishingProgress(p).allAccounted);
- return '<div class="manual-receipt-summary"><strong>External publishing — user-entered only</strong><p class="muted">'+progress.live+' / '+progress.total+' platforms reported live · '+progress.covered+' scheduled or live'+(legacy?' · Legacy overall status (no channel receipt)':'')+'</p>'
- +(list.length?'<details><summary>View '+list.length+' manual record'+(list.length===1?'':'s')+'</summary>'+list.slice().reverse().map(function(r){
-  return '<p class="muted">'+esc(r.platform)+' · '+esc(r.stage)+' · '+esc(r.account)+' · '+esc(r.recordedAt.slice(0,16).replace('T',' '))
-   +(r.scheduledFor?' · due '+esc(r.scheduledFor.replace('T',' ')):'')
-   +(r.publicUrl?' · <a href="'+esc(r.publicUrl)+'" target="_blank" rel="noopener noreferrer">Public link</a>':'')+'</p>'
- }).join('')+'</details>':'<p class="muted">No per-platform manual records yet.</p>')+'</div>';
+ var entries=currentPublicationReceipts(p),progress=manualPublishingProgress(p);
+ var incompleteOverall=['Published','Scheduled manually'].includes(p.status)&&!progress.allAccounted;
+ var channels=Array.from(new Set((p.networks||[]).filter(function(n){return CHANNELS.includes(n)})));
+ return '<div class="manual-receipt-summary"><strong>External publishing · manually recorded</strong>'
+  +'<p class="muted">'+progress.live+' of '+progress.total+' selected platforms reported live · '+progress.covered+' scheduled or live.'
+  +(incompleteOverall?' Older overall status lacks complete per-platform records.':'')+'</p>'
+  +(channels.length?'<div class="hq-channel-progress">'+channels.map(function(name){
+   var r=progress.last[name],state=r?(r.stage==='published'?'Live · self-reported':'Scheduled · self-reported'):'Not confirmed in HQ';
+   return '<div class="hq-channel-row"><strong>'+esc(name)+'</strong><span>'+esc(state)+'</span>'
+    +(r&&r.account?'<small>'+esc(r.account)+'</small>':'')
+    +(r&&r.publicUrl?'<a href="'+esc(r.publicUrl)+'" target="_blank" rel="noopener noreferrer">View public post</a>':'')
+    +'</div>';
+  }).join('')+'</div>':'<p class="muted">Select a target platform before recording external activity.</p>')
+  +(entries.length?'<details><summary>View '+entries.length+' manual history entr'+(entries.length===1?'y':'ies')+'</summary>'+entries.slice().reverse().map(function(r){
+   return '<p class="muted">'+esc(r.platform)+' · '+esc(r.stage)+' · '+esc(r.account)+' · recorded '+esc(r.recordedAt.slice(0,16).replace('T',' '))
+    +(r.scheduledFor?' · scheduled for '+esc(r.scheduledFor.replace('T',' ')):'')
+    +(r.publicUrl?' · <a href="'+esc(r.publicUrl)+'" target="_blank" rel="noopener noreferrer">Public link</a>':'')+'</p>';
+  }).join('')+'</details>':'<p class="muted">No verified-by-you external results entered yet.</p>')
+  +'</div>';
 }
-
 function posts(){
  var list=profileRecords('posts').slice().filter(function(x){
   var byStatus=postFilter==='all'||x.status===postFilter;
