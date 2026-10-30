@@ -128,3 +128,22 @@ Quick status selection for Scheduled/Published opens the same per-channel record
 Limitations: account handles are self-entered notes, not authenticated channels. True Buffer verification requires a protected server API token, confirmed channel IDs, and real provider response receipts. Never put the Buffer API key in the public static app. Private encrypted device images do not become public URLs automatically. Current Buffer GraphQL draft creation is available on Free but is not connected to HQ.
 
 References: https://developers.buffer.com/examples/create-draft-post.html ; https://developers.buffer.com/guides/authentication.html
+
+
+## Manual per-platform publishing records
+
+The public /admin/ HQ remains **local, encrypted and offline-first**. The iPhone Share sheet and the “Open Buffer” link are **not an API connection**; a successful share callback does not confirm that Buffer saved, scheduled or published anything. Do not put API keys in the public HTML, local profile notes, GitHub Pages or downloadable ZIPs.
+
+For an approved post, select **Posts → More actions → Record external result**. The dialog asks for (1) one of the post's selected social platforms, (2) the actual external account name/@handle, (3) “Scheduled / queued” or “Published / live”, (4) a checked acknowledgement that the user saw that exact result outside HQ, and (5) an HTTPS public link for a live result. An optional scheduled local date/time is allowed. The platform list and account-name suggestions are scoped to the selected internal LIFE/Bears/future profile, but saved account handles are *notes only* and not proof of authorisation. Per-platform records are tagged `source: manual`, revisioned with the approved content, encrypted in the existing workspace, and visibly described as **self-reported**. A public link is a user assertion, not Buffer API proof.
+
+The overall post status is **Ready** while one or more selected platforms are not yet accounted for; **Scheduled manually** when all channels have some manually recorded scheduled or live outcome but not all are live; **Published** only once all targeted channels have been reported live. The Posts page includes a per-channel status table and a **Publishing follow-up** summary, while Reports shows the manual entries and platform gaps. Older overall Published/Scheduled statuses are retained, with a warning when per-platform details are incomplete. These are only local records and never alter the real Buffer queue.
+
+The **full post editor** and bulk status dropdown cannot fabricate external Scheduled/Published states. Each platform needs its own checked record. A duplicate post becomes an unpublished Draft, without external receipts, dates/links or metrics carried over. Resetting a post to Draft/Needs review increases its content revision, preserving earlier external receipts as historical records but no longer treating them as current publication proof. A truly published record is never implicitly reset or deleted by making a copy. Changes use the existing encrypted save and rollback procedures; all account notes and source records stay profile-scoped.
+
+### Remaining external integration requirements
+
+A direct Buffer integration is **not active**. Real scheduling receipts, provider post IDs and analytics require a trusted server-side integration (not static GitHub Pages), approved user authorisation, protected credentials, explicit allowlisted channel IDs per HQ profile, idempotent draft creation, and a distinction between manual and API-confirmed events. The prepared private `in-full` integration must be independently reviewed, configured and tested with a single approved draft before offering real automation. Never connect or publish to unauthorised/personal/St John accounts.
+
+### Testing performed
+
+Isolated JavaScript checks covered a two-channel Facebook/Instagram example (one live and another scheduled), status transitions, platform-specific report rendering, cross-profile isolation, missing URLs, invalid provider claims, old-receipt revision filtering, single/bulk reset protections, copy sanitisation and source syntax. These checks are **not** a substitute for real iPhone Safari testing or provider-side confirmation. Preserve encrypted backups including images.
