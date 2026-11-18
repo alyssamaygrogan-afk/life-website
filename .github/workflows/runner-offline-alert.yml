@@ -53,7 +53,7 @@ jobs:
               core.info('Runner check is queued or running within its grace period.');
             } else {
               const detail = !latest ? 'No heartbeat run was found.' :
-                latest.status === 'completed' ? 'The latest health check did not succeed.' :
+                latest.status === 'completed' ? (latest.conclusion === 'success' ? 'The last successful health check is stale.' : 'The latest health check did not succeed.') :
                 'The latest health check has not completed within the grace period.';
               if (!incident) {
                 await github.rest.issues.create({owner, repo,
