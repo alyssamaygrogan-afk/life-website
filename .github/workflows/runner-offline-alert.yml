@@ -1,0 +1,71 @@
+name: Windows runner offline alert
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '37 * * * *'
+
+permissions:
+  actions: read
+  issues: write
+
+concurrency:
+  group: windows-runner-offline-alert
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    # Standard hosted compute is free for this public repository.
+    # The check stays online when the Windows PC is switched off.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the latest runner heartbeat and manage one incident
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const now = Date.now();
+            const result = await github.rest.actions.listWorkflowRuns({
+              owner, repo, workflow_id: 'runner-smoke.yml',
+              branch: 'main', per_page: 20
+            });
+            const runs = result.data.workflow_runs;
+            const latest = runs[0];
+            const lastSuccess = runs.find(r => r.status === 'completed' && r.conclusion === 'success');
+            const age = r => r ? (now - Date.parse(r.created_at)) / 60000 : Infinity;
+            const healthy = latest?.conclusion === 'success' && age(latest) < 100;
+            const settling = latest && ['queued','in_progress','waiting','pending','requested'].includes(latest.status)
+              && age(latest) < 30 && age(lastSuccess) < 100;
+            const marker = '<!-- windows-runner-health-incident -->';
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', per_page: 100
+            });
+            const incident = issues.find(i => !i.pull_request && i.user?.login === 'github-actions[bot]' && i.body?.includes(marker));
+            if (healthy) {
+              if (incident) {
+                await github.rest.issues.update({owner, repo, issue_number: incident.number,
+                  state: 'closed', state_reason: 'completed',
+                  body: marker + '\n\nRecovered: the Windows runner completed its latest health check.\n\n' + latest.html_url});
+              }
+              core.info('Runner heartbeat is healthy.');
+            } else if (settling) {
+              core.info('Runner check is queued or running within its grace period.');
+            } else {
+              const detail = !latest ? 'No heartbeat run was found.' :
+                latest.status === 'completed' ? 'The latest health check did not succeed.' :
+                'The latest health check has not completed within the grace period.';
+              if (!incident) {
+                await github.rest.issues.create({owner, repo,
+                  title: 'Windows runner needs attention',
+                  assignees: [owner],
+                  body: marker + '\n\n@' + owner + ' ' + detail +
+                    '\n\nThe PC may be switched off, disconnected, busy, or its runner service may need attention.' +
+                    '\n\nCheck the Windows GitHub Actions Runner services and the linked run.' +
+                    (latest ? '\n\n' + latest.html_url : '') +
+                    '\n\nThis issue closes automatically after a successful heartbeat. No private repository data or credentials are included.'});
+                core.setFailed('Runner health alert opened and assigned to the repository owner.');
+              } else {
+                core.warning('The existing runner incident remains open; no duplicate notification sent.');
+              }
+            }

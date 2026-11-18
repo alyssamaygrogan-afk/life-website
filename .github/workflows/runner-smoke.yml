@@ -1,0 +1,68 @@
+name: Windows runner smoke test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7 * * * *'
+  push:
+    branches: [maintenance/runner-reliability-20261118]
+    paths: ['.github/workflows/runner-smoke.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runner-smoke-${{ github.repository }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ". '{0}'"
+    steps:
+      - name: Check out a small exact revision in an isolated directory
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: runner-health-${{ github.run_id }}-${{ github.run_attempt }}
+          clean: false
+          persist-credentials: false
+          sparse-checkout: |
+            .github
+            package.json
+            README.md
+          sparse-checkout-cone-mode: false
+      - name: Verify service identity, tools, checkout and temporary writes
+        working-directory: runner-health-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+          if ($identity.User.Value -ne 'S-1-5-20') { throw 'Expected the Network Service account.' }
+          Write-Output 'Verified runner service account.'
+          $services = @(Get-Service -Name 'actions.runner.*')
+          if ($services.Count -lt 3 -or @($services | Where-Object Status -ne Running).Count -gt 0) { throw 'One or more expected runner services are not running.' }
+          & git --version
+          if ($LASTEXITCODE -ne 0) { throw 'Git is unavailable.' }
+          $actual = (& git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $actual -ne $env:GITHUB_SHA) { throw 'Checkout revision mismatch.' }
+          & node --version
+          if ($LASTEXITCODE -ne 0) { throw 'Node.js is unavailable.' }
+          & node -e "const [a,b]=process.versions.node.split('.').map(Number);if(a<22||(a===22&&b<12))process.exit(1);require('node:assert/strict').equal(2+2,4)"
+          if ($LASTEXITCODE -ne 0) { throw 'Node.js runtime check failed.' }
+          & npm.cmd --version
+          if ($LASTEXITCODE -ne 0) { throw 'npm is unavailable.' }
+          & cmd.exe /d /c "java -version 2>&1"
+          if ($LASTEXITCODE -ne 0) { throw 'Java is unavailable.' }
+          $probe = Join-Path $env:RUNNER_TEMP ([IO.Path]::GetRandomFileName())
+          try {
+            [IO.File]::WriteAllText($probe, 'runner-health-ok')
+            if ([IO.File]::ReadAllText($probe) -ne 'runner-health-ok') { throw 'Temporary file verification failed.' }
+          } finally {
+            if (Test-Path -LiteralPath $probe) { Remove-Item -LiteralPath $probe }
+          }
+          $free = (Get-PSDrive -Name C).Free
+          if ($free -lt 10GB) { throw 'Less than 10 GB disk space remains.' }
+          Write-Output 'Checkout, Node.js, npm, Git, Java, temporary storage and disk capacity passed.'
